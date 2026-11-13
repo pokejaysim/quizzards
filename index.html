@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quizzards</title>
+<meta name="description" content="A wizard-themed trivia board game for four houses.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+:root{--accent:#E2B857;--bg:#14182B;--card:#1E2440;--line:#2E3558;--line2:#3A4266;--chip:#2A3156;--text:#F3EFE6;--muted:#A9AEC4}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif}
+button{font-family:inherit;cursor:pointer}
+#app{max-width:1200px;margin:0 auto;padding:36px 24px 56px;display:flex;flex-direction:column;gap:28px}
+.top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:20px}
+h1{margin:0;font-family:Cinzel,Georgia,serif;font-weight:700;font-size:44px;line-height:1.1;color:var(--accent)}
+.scores{display:flex;flex-wrap:wrap;align-items:stretch;gap:12px}
+.score,.wager{display:flex;flex-direction:column;gap:4px;min-width:132px;padding:0 0 12px;background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.bar{height:5px}
+.score-name{padding:6px 18px 0;font-size:13px;font-weight:600;color:var(--muted)}
+.score-num{padding:0 18px;font-size:30px;font-weight:700}
+.btn{min-height:48px;padding:0 22px;border-radius:12px;font-size:16px;font-weight:600;border:1px solid var(--line2);background:var(--chip);color:var(--text)}
+.btn.ghost{background:transparent;color:var(--muted);min-height:44px;font-size:14px;align-self:center}
+.btn.gold{background:var(--accent);color:var(--bg);border:none;font-weight:700}
+.btn.big{min-height:52px;padding:0 28px;font-size:17px;align-self:flex-start}
+.btn.center{align-self:center}
+.btn.right{align-self:flex-end}
+.btn:focus-visible,.tile:focus-visible,.back:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.stack{display:flex;flex-direction:column;gap:16px}
+.stack-sm{display:flex;flex-direction:column;gap:10px}
+.row{display:flex;flex-wrap:wrap;gap:10px}
+.muted{color:var(--muted);margin:0;font-size:16px}
+.small{font-size:14px}
+.lead{font-size:17px;line-height:1.5}
+.board-intro{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px 20px}
+.board-scroll{overflow-x:auto;padding-bottom:4px}
+.board{min-width:760px;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.head{display:flex;align-items:center;justify-content:center;min-height:64px;padding:8px 10px;background:#232A4A;border-radius:12px;text-align:center;font-family:Cinzel,Georgia,serif;font-weight:700;font-size:17px;line-height:1.2;color:var(--accent)}
+.tile{min-height:48px;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:10px;font-size:22px;font-weight:700}
+.tile:hover{border-color:var(--accent)}
+.tile.used{background:#171B30;border:1px dashed var(--line)}
+.cleared{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:16px;padding:28px 32px;background:var(--card);border:2px solid var(--accent);border-radius:20px}
+.cleared>div{display:flex;flex-direction:column;gap:6px}
+.cleared-text{font-size:24px;font-weight:600}
+.eyebrow{font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.eyebrow.accent{color:var(--accent)}
+.narrow{display:flex;flex-direction:column;gap:20px;width:100%;max-width:900px;margin:0 auto}
+.narrow.wide{max-width:960px}
+.back{align-self:flex-start;display:flex;align-items:center;gap:8px;min-height:44px;padding:0 4px;background:transparent;color:var(--muted);border:none;font-size:15px;font-weight:600}
+.card{display:flex;flex-direction:column;gap:28px;padding:44px;background:var(--card);border:1px solid var(--line);border-radius:22px}
+.card.final{border:2px solid var(--accent)}
+.meta{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px}
+.meta-right{display:flex;align-items:center;gap:12px}
+.chip{padding:6px 14px;background:var(--chip);border-radius:999px;font-size:14px;font-weight:600}
+.dots{display:flex;gap:4px}
+.dot{width:8px;height:16px;border-radius:3px}
+.pts{font-size:18px;font-weight:700;color:var(--accent)}
+.question{margin:0;font-size:34px;font-weight:600;line-height:1.3}
+.answer{display:flex;flex-direction:column;gap:6px;padding:20px 24px;background:var(--bg);border:1px solid var(--accent);border-radius:16px}
+.answer-text{font-size:28px;font-weight:700;color:var(--accent)}
+.label{font-size:15px;font-weight:600;color:var(--muted)}
+.btn.house{display:flex;align-items:center;gap:10px}
+.pip{width:12px;height:12px;border-radius:6px;display:inline-block;flex:none}
+.big-pip{width:14px;height:14px;border-radius:7px}
+.final-title{font-family:Cinzel,Georgia,serif;font-weight:700;font-size:30px;color:var(--accent)}
+.wagers{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.wager{background:var(--bg);gap:8px;padding-bottom:18px}
+.wager-name{padding:6px 18px 0;font-size:18px;font-weight:700}
+.pad{padding:0 18px}
+.wager .label{padding-top:6px;font-size:13px}
+.wager input{margin:0 18px;min-height:48px;padding:0 14px;background:var(--card);color:var(--text);border:1px solid var(--line2);border-radius:10px;font-family:inherit;font-size:20px;font-weight:700}
+.judge-row{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;padding:14px 18px;background:var(--bg);border:1px solid var(--line);border-radius:14px}
+.row-left{display:flex;align-items:center;gap:12px;font-size:18px}
+.btn.judge{min-height:44px;font-size:15px}
+.btn.right-on{background:#2F7D4F}
+.btn.wrong-on{background:#B23A35}
+.winner{display:flex;flex-direction:column;gap:8px;text-align:center;padding:12px 0}
+.winner-text{font-family:Cinzel,Georgia,serif;font-weight:700;font-size:40px;line-height:1.2;color:var(--accent)}
+.rank{display:flex;align-items:center;gap:16px;padding:16px 22px;background:var(--bg);border:1px solid var(--line);border-radius:14px}
+.place{width:36px;font-size:22px;font-weight:700;color:var(--muted)}
+.rank-name{flex:1 1 auto;font-size:20px;font-weight:700}
+.rank-score{min-width:56px;text-align:right;font-size:28px;font-weight:700}
+@media (max-width:640px){h1{font-size:34px}.card{padding:24px}.question{font-size:26px}.winner-text{font-size:30px}.rank{flex-wrap:wrap}}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<script>
+// Question library: each category has 10 levels (1 = easiest, 10 = hardest),
+// and each level holds a pool of [question, answer] pairs. One is drawn per game.
+var CATS = [
+  { name: "Spells", qs: [
+    [["What spell lights up the tip of your wand?", "Lumos"],
+     ["What spell puts out the light from a wand?", "Nox"],
+     ["What incantation casts the Patronus Charm?", "Expecto Patronum"]],
+    [["Which levitation charm does Hermione tell Ron he's mispronouncing?", "Wingardium Leviosa"],
+     ["What is the incantation for the Killing Curse?", "Avada Kedavra"],
+     ["What does the spell Reparo do?", "Repairs broken objects"]],
+    [["What spell unlocks doors?", "Alohomora"],
+     ["What phrase makes the Marauder's Map appear?", "\"I solemnly swear that I am up to no good\""],
+     ["What spell stuns an opponent?", "Stupefy"]],
+    [["What disarming spell became Harry's signature move?", "Expelliarmus"],
+     ["When Ron's broken wand backfires in second year, what does his curse make him do?", "Burp up slugs"],
+     ["The spell Riddikulus is used to defeat what creature?", "A Boggart"]],
+    [["What spell does Harry use to call his Firebolt to him during the first Triwizard task?", "Accio"],
+     ["Name all three Unforgivable Curses.", "Avada Kedavra, Crucio and Imperio"],
+     ["What spell backfires on Lockhart in the Chamber of Secrets and wipes his memory?", "Obliviate (a Memory Charm)"]],
+    [["What spell does Hermione use to freeze Neville stiff in first year?", "Petrificus Totalus (the Full Body-Bind)"],
+     ["What spell does Draco use at the Duelling Club to make Harry's legs dance?", "Tarantallegra"],
+     ["What Half-Blood Prince spell hangs a person upside down by the ankle?", "Levicorpus"]],
+    [["What form does Hermione's Patronus take?", "An otter"],
+     ["What form does Ron's Patronus take?", "A Jack Russell terrier"],
+     ["What form does Snape's Patronus take?", "A doe"]],
+    [["What spell conjures the Dark Mark into the sky?", "Morsmordre"],
+     ["What Half-Blood Prince spell glues a person's tongue to the roof of their mouth?", "Langlock"],
+     ["What does Hermione's jinx on the DA sign-up sheet do to whoever betrays the group?", "Spells out SNEAK in pimples across their face"]],
+    [["What slashing curse did the Half-Blood Prince invent?", "Sectumsempra"],
+     ["What charm does Hermione put on the fake Galleons the DA uses to send meeting times?", "The Protean Charm"],
+     ["What spell does Hermione use to try to reveal the Half-Blood Prince's secrets in his book?", "Specialis Revelio"]],
+    [["What spell does Amos Diggory use on Harry's wand at the World Cup to reveal the last spell it cast?", "Prior Incantato"],
+     ["What spell does Hermione use to send her conjured birds flying at Ron?", "Oppugno"],
+     ["What spell does Hermione try on Tom Riddle's diary to reveal invisible ink?", "Aparecium"]]
+  ]},
+  { name: "Hogwarts", qs: [
+    [["Which house is Harry sorted into?", "Gryffindor"],
+     ["Who is the headmaster of Hogwarts for most of the series?", "Albus Dumbledore"],
+     ["How many houses are there at Hogwarts?", "Four"]],
+    [["What platform does the Hogwarts Express leave from?", "Platform 9¾"],
+     ["Which house is Draco Malfoy in?", "Slytherin"],
+     ["What animal represents Hufflepuff?", "A badger"]],
+    [["What object decides which house new students join?", "The Sorting Hat"],
+     ["Which house is represented by an eagle?", "Ravenclaw"],
+     ["What is the woods next to Hogwarts called?", "The Forbidden Forest"]],
+    [["What village near Hogwarts can students visit starting in third year?", "Hogsmeade"],
+     ["What tree attacks Harry and Ron's flying car?", "The Whomping Willow"],
+     ["What is the name of the poltergeist who causes trouble at Hogwarts?", "Peeves"]],
+    [["What is the name of Gryffindor's house ghost?", "Nearly Headless Nick"],
+     ["Who is head of Gryffindor house?", "Professor Minerva McGonagall"],
+     ["What is the name of the joke shop in Hogsmeade?", "Zonko's"]],
+    [["Which seventh-floor room opens when you walk past it three times thinking of what you need?", "The Room of Requirement"],
+     ["Which ghost haunts the girls' bathroom on the second floor?", "Moaning Myrtle"],
+     ["What is the name of the sweet shop in Hogsmeade?", "Honeydukes"]],
+    [["What are the names of the Hogwarts caretaker and his cat?", "Argus Filch and Mrs Norris"],
+     ["What is the name of Slytherin's house ghost?", "The Bloody Baron"],
+     ["Who is head of Hufflepuff house?", "Professor Pomona Sprout"]],
+    [["Which part of the castle is the Hufflepuff common room entrance near?", "The kitchens"],
+     ["To get into the Hogwarts kitchens, what do you tickle?", "The pear in the painting of a bowl of fruit"],
+     ["Where is the Slytherin common room?", "In the dungeons, under the lake"]],
+    [["Instead of a password, what must you do to get into Ravenclaw Tower?", "Answer a riddle"],
+     ["What is the name of Ravenclaw's house ghost?", "The Grey Lady"],
+     ["Name all four founders of Hogwarts.", "Godric Gryffindor, Helga Hufflepuff, Rowena Ravenclaw and Salazar Slytherin"]],
+    [["What is the Hogwarts school motto?", "Draco dormiens nunquam titillandus (Never tickle a sleeping dragon)"],
+     ["What is the name of Hufflepuff's house ghost?", "The Fat Friar"],
+     ["Which statue hides the secret passage to the Honeydukes cellar?", "The one-eyed witch"]]
+  ]},
+  { name: "Characters", qs: [
+    [["Who are Harry's two best friends?", "Ron Weasley and Hermione Granger"],
+     ["Who is the half-giant gamekeeper at Hogwarts?", "Hagrid"],
+     ["What is the name of Harry's cousin?", "Dudley Dursley"]],
+    [["What is Lord Voldemort's real name?", "Tom Marvolo Riddle"],
+     ["What are the first names of Harry's aunt and uncle?", "Petunia and Vernon"],
+     ["Who is Harry's main rival from Slytherin?", "Draco Malfoy"]],
+    [["What house-elf does Harry free by tricking Lucius Malfoy into giving him a sock?", "Dobby"],
+     ["What is the name of Ron's younger sister?", "Ginny Weasley"],
+     ["Which Weasley twins open a joke shop?", "Fred and George"]],
+    [["Who is Harry's godfather?", "Sirius Black"],
+     ["What are the first names of Harry's parents?", "James and Lily"],
+     ["Which Gryffindor boy keeps losing his toad, Trevor?", "Neville Longbottom"]],
+    [["What is Hagrid's first name?", "Rubeus"],
+     ["Which Ravenclaw girl, nicknamed \"Loony,\" wears radish earrings?", "Luna Lovegood"],
+     ["What is Professor McGonagall's first name?", "Minerva"]],
+    [["Which werewolf teaches Defence Against the Dark Arts in Harry's third year?", "Remus Lupin"],
+     ["Who betrayed Harry's parents to Voldemort?", "Peter Pettigrew"],
+     ["Who does Harry take to the Yule Ball?", "Parvati Patil"]],
+    [["Who turns out to be the Half-Blood Prince?", "Severus Snape"],
+     ["Who is Harry's first crush, the Ravenclaw Seeker?", "Cho Chang"],
+     ["Which Death Eater is Sirius Black's cousin?", "Bellatrix Lestrange"]],
+    [["Who spends Harry's fourth year disguised as Mad-Eye Moody?", "Barty Crouch Jr."],
+     ["What is the name of the Black family's house-elf?", "Kreacher"],
+     ["What is Hermione's middle name?", "Jean"]],
+    [["What is the name of Dumbledore's brother, and which pub does he run?", "Aberforth Dumbledore, the Hog's Head"],
+     ["What is the name of Hagrid's giant half-brother?", "Grawp"],
+     ["What is Luna's father's name, and what magazine does he run?", "Xenophilius Lovegood, The Quibbler"]],
+    [["What are Dumbledore's three middle names?", "Percival Wulfric Brian"],
+     ["What was Snape's mother's maiden name?", "Prince (Eileen Prince)"],
+     ["What was the name of Voldemort's mother?", "Merope Gaunt"]]
+  ]},
+  { name: "Magical Creatures", qs: [
+    [["What kind of bird is Hedwig?", "A snowy owl"],
+     ["What kind of creature is Dobby?", "A house-elf"],
+     ["What kind of animal is Hagrid's pet Fang?", "A dog (a boarhound)"]],
+    [["What kind of animal is Ron's pet Scabbers?", "A rat"],
+     ["What is the name of Neville's toad?", "Trevor"],
+     ["What creatures guard the wizard prison Azkaban?", "Dementors"]],
+    [["What makes Fluffy the three-headed dog fall asleep?", "Music"],
+     ["What creatures run Gringotts bank?", "Goblins"],
+     ["What animal is Harry's Patronus?", "A stag"]],
+    [["What kind of creature is Buckbeak?", "A hippogriff"],
+     ["What huge creature with tentacles lives in the Black Lake?", "The giant squid"],
+     ["What blue creatures does Lockhart release in his first lesson?", "Cornish pixies"]],
+    [["What kind of bird is Fawkes?", "A phoenix"],
+     ["What giant serpent lives in the Chamber of Secrets?", "A basilisk"],
+     ["What creatures live in the Black Lake and guard the hostages in the second task?", "Merpeople"]],
+    [["What does Hagrid name the baby dragon he hatches in first year?", "Norbert"],
+     ["What is the name of Ron's tiny owl?", "Pigwidgeon"],
+     ["What creature's blood keeps Voldemort alive in the Forbidden Forest?", "A unicorn's"]],
+    [["What is the name of the giant spider Hagrid raised?", "Aragog"],
+     ["What creatures does Hagrid breed in fourth year that sting and explode?", "Blast-Ended Skrewts"],
+     ["What kind of creature is Firenze?", "A centaur"]],
+    [["Which breed of dragon does Harry face in the first Triwizard task?", "A Hungarian Horntail"],
+     ["What water demons grab at Harry during the second task?", "Grindylows"],
+     ["What creature asks Harry a riddle in the Triwizard maze?", "A sphinx"]],
+    [["What creatures pull the Hogwarts carriages, visible only to those who have seen death?", "Thestrals"],
+     ["What new name does Hagrid give Buckbeak to hide him?", "Witherwings"],
+     ["What creature is drawn to shiny things and digs for treasure?", "A Niffler"]],
+    [["Crookshanks is part cat and part what magical creature?", "Kneazle"],
+     ["What imaginary creature is Luna's father always searching for?", "The Crumple-Horned Snorkack"],
+     ["What breed of dragon is Norbert?", "A Norwegian Ridgeback"]]
+  ]},
+  { name: "Quidditch", qs: [
+    [["What position does Harry play?", "Seeker"],
+     ["What do Quidditch players fly on?", "Broomsticks"],
+     ["What colour is the Snitch?", "Gold"]],
+    [["How many points is catching the Golden Snitch worth?", "150"],
+     ["How many points is a goal worth?", "10"],
+     ["What do Beaters carry to hit Bludgers?", "Bats"]],
+    [["What is the ball Chasers throw through the hoops called?", "The Quaffle"],
+     ["What position does Ron play?", "Keeper"],
+     ["How many goal hoops are at each end of the pitch?", "Three"]],
+    [["What are the balls that try to knock players off their brooms called?", "Bludgers"],
+     ["Who commentates the Hogwarts matches, a friend of Fred and George?", "Lee Jordan"],
+     ["What position do Fred and George play?", "Beaters"]],
+    [["How many players are on a Quidditch team?", "Seven"],
+     ["Who teaches flying lessons at Hogwarts?", "Madam Hooch"],
+     ["Who is Slytherin's Seeker in Harry's year?", "Draco Malfoy"]],
+    [["What was Harry's first broomstick?", "The Nimbus 2000"],
+     ["What position does Cedric Diggory play for Hufflepuff?", "Seeker (he's also captain)"],
+     ["What brooms does Lucius Malfoy buy for the whole Slytherin team?", "Nimbus 2001s"]],
+    [["Who sent Harry the Firebolt?", "Sirius Black"],
+     ["Who becomes Gryffindor's Quidditch captain in Harry's sixth year?", "Harry"],
+     ["What destroys Harry's Nimbus 2000?", "The Whomping Willow"]],
+    [["Who was Gryffindor's Quidditch captain in Harry's first three years?", "Oliver Wood"],
+     ["Which professional team does Oliver Wood sign with?", "Puddlemere United"],
+     ["Which Quidditch book does Snape confiscate from Harry in first year?", "Quidditch Through the Ages"]],
+    [["Which country won the 1994 Quidditch World Cup?", "Ireland"],
+     ["Who was Ireland's Seeker in the 1994 World Cup final?", "Aidan Lynch"],
+     ["What were Bulgaria's mascots at the World Cup?", "Veela"]],
+    [["What is the name of the fake-out dive Viktor Krum uses to trick the other Seeker?", "The Wronski Feint"],
+     ["What was the final score of the 1994 World Cup final?", "Ireland 170, Bulgaria 160"],
+     ["Which orange-robed professional team does Ron support?", "The Chudley Cannons"]]
+  ]},
+  { name: "Potions", qs: [
+    [["Who teaches Potions for Harry's first five years?", "Severus Snape"],
+     ["What pot do students brew their potions in?", "A cauldron"],
+     ["Which of Harry's friends is best at Potions homework?", "Hermione"]],
+    [["Which potion lets you take on someone else's appearance?", "Polyjuice Potion"],
+     ["Which house is Snape head of?", "Slytherin"],
+     ["Whose old textbook does Harry use in sixth-year Potions?", "The Half-Blood Prince's"]],
+    [["What do you have to add to Polyjuice Potion from the person you're becoming?", "A piece of them, like a hair"],
+     ["What goes wrong when Hermione drinks Polyjuice in second year?", "She used a cat hair, so she turns part cat"],
+     ["What potion does Madam Pomfrey use to regrow the bones in Harry's arm?", "Skele-Gro"]],
+    [["Which potion is nicknamed \"liquid luck\"?", "Felix Felicis"],
+     ["Whose bathroom do Harry, Ron and Hermione brew Polyjuice in?", "Moaning Myrtle's"],
+     ["What does Pepperup Potion do?", "Cures colds, and makes steam come out of your ears"]],
+    [["What truth serum makes the drinker reveal their secrets?", "Veritaserum"],
+     ["Who gives Ron chocolates spiked with love potion in sixth year?", "Romilda Vane"],
+     ["What potion is used to revive the students who were Petrified?", "Mandrake Restorative Draught"]],
+    [["Who teaches Potions in Harry's sixth year?", "Horace Slughorn"],
+     ["What is the name of Slughorn's club for favourite students?", "The Slug Club"],
+     ["Who brews the Polyjuice Potion in second year?", "Hermione"]],
+    [["What stone, taken from a goat's stomach, saves you from most poisons?", "A bezoar"],
+     ["What poisons Ron in Slughorn's office?", "Poisoned oak-matured mead"],
+     ["What does Harry drink to help him get Slughorn's real memory?", "Felix Felicis"]],
+    [["What is the most powerful love potion, the one that smells different to each person?", "Amortentia"],
+     ["Which ingredients does Hermione steal from Snape's stores for the Polyjuice?", "Boomslang skin and bicorn horn"],
+     ["What does the Draught of Peace do?", "Calms anxiety"]],
+    [["What potion does Snape brew for Lupin every month?", "Wolfsbane Potion"],
+     ["What happens if you take too much Felix Felicis?", "Giddiness, recklessness and dangerous overconfidence"],
+     ["What is the potion-ingredient shop in Diagon Alley called?", "Slug & Jiggers Apothecary"]],
+    [["In Harry's first Potions class, Snape asks what you get from asphodel and wormwood. What's the answer?", "The Draught of Living Death"],
+     ["When Slughorn shows the class Amortentia, what does Hermione say she smells?", "Freshly mown grass and new parchment (then she stops herself)"],
+     ["Name any three ingredients in Polyjuice Potion.", "Any three of: lacewing flies, leeches, fluxweed, knotgrass, bicorn horn, boomslang skin"]]
+  ]}
+];
+
+var FINALS = [
+  { cat: "The Deathly Hallows", q: "In the tale of the three brothers, the Deathly Hallows first belonged to the Peverell brothers. What were the three brothers' first names?", a: "Antioch, Cadmus and Ignotus Peverell" },
+  { cat: "Horcruxes", q: "Name all six Horcruxes that Voldemort made on purpose.", a: "Tom Riddle's diary, Marvolo Gaunt's ring, Slytherin's locket, Hufflepuff's cup, Ravenclaw's diadem and Nagini" },
+  { cat: "Wandlore", q: "What wood and what core is Voldemort's original wand made of?", a: "Yew, with a phoenix feather core" },
+  { cat: "Godric's Hollow", q: "What words are carved on James and Lily Potter's gravestone?", a: "\"The last enemy that shall be destroyed is death\"" },
+  { cat: "The Mirror of Erised", q: "When Harry asks what Dumbledore sees in the Mirror of Erised, what does Dumbledore say he sees?", a: "Himself holding a pair of thick, woollen socks" }
+];
+
+var HOUSES = [
+  { name: "Gryffindor", color: "#D6453D" },
+  { name: "Hufflepuff", color: "#ECB939" },
+  { name: "Ravenclaw", color: "#6E93E0" },
+  { name: "Slytherin", color: "#4FA36A" }
+];
+
+var SEEN_KEY = "quizzards-seen-v1";
+function loadSeen() {
+  try { return JSON.parse(window.localStorage.getItem(SEEN_KEY) || "{}") || {}; } catch (e) { return {}; }
+}
+function saveSeen(seen) {
+  try { window.localStorage.setItem(SEEN_KEY, JSON.stringify(seen)); } catch (e) {}
+}
+// Pick a random index from a pool of n, preferring ones not seen yet.
+// When every question in the pool has been seen, that pool starts over.
+function pickUnseen(n, prefix, seen) {
+  var open = [];
+  for (var i = 0; i < n; i++) if (!seen[prefix + i]) open.push(i);
+  if (open.length === 0) {
+    for (var k = 0; k < n; k++) delete seen[prefix + k];
+    for (var j = 0; j < n; j++) open.push(j);
+  }
+  return open[Math.floor(Math.random() * open.length)];
+}
+
+var TOTAL_QUESTIONS = CATS.reduce(function (sum, c) {
+  return sum + c.qs.reduce(function (s2, pool) { return s2 + pool.length; }, 0);
+}, 0);
+
+
+// ---------- Game state ----------
+var state;
+var lastView = "";
+
+function fresh() {
+  var seen = loadSeen();
+  var deal = CATS.map(function (c, ci) {
+    return c.qs.map(function (pool, li) { return pickUnseen(pool.length, ci + "-" + li + "-", seen); });
+  });
+  var finalIdx = pickUnseen(FINALS.length, "F-", seen);
+  saveSeen(seen);
+  return {
+    screen: "board", cat: 0, v: 1, revealed: false,
+    scores: [0, 0, 0, 0], used: {}, deal: deal, finalIdx: finalIdx,
+    finalStep: "wager", wagers: ["", "", "", ""], judged: [null, null, null, null], before: [0, 0, 0, 0]
+  };
+}
+
+function setState(patch) {
+  Object.assign(state, patch);
+  render();
+}
+
+function markSeen(key) {
+  var seen = loadSeen();
+  seen[key] = true;
+  saveSeen(seen);
+}
+
+function maxWager(i) { return Math.max(state.scores[i], 10); }
+
+function esc(t) {
+  return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function usedCount() { return Object.keys(state.used).length; }
+
+// ---------- Actions ----------
+var actions = {
+  reset: function () { state = fresh(); render(); },
+  pick: function (el) { setState({ screen: "question", cat: +el.dataset.cat, v: +el.dataset.v, revealed: false }); },
+  reveal: function () { setState({ revealed: true }); },
+  back: function () { setState({ screen: "board", revealed: false }); },
+  award: function (el) {
+    var team = +el.dataset.team;
+    var scores = state.scores.slice();
+    if (team >= 0) scores[team] += state.v;
+    var used = Object.assign({}, state.used);
+    used[state.cat + "-" + state.v] = true;
+    markSeen(state.cat + "-" + (state.v - 1) + "-" + state.deal[state.cat][state.v - 1]);
+    setState({ scores: scores, used: used, screen: "board", revealed: false });
+  },
+  startFinal: function () { setState({ screen: "final", finalStep: "wager", wagers: ["", "", "", ""], judged: [null, null, null, null] }); },
+  lockWagers: function () {
+    var w = state.wagers.map(function (raw, i) {
+      var n = parseInt(raw, 10);
+      if (isNaN(n)) n = 0;
+      return String(Math.min(Math.max(n, 0), maxWager(i)));
+    });
+    setState({ wagers: w, finalStep: "question" });
+  },
+  revealFinal: function () { markSeen("F-" + state.finalIdx); setState({ finalStep: "judge" }); },
+  judge: function (el) {
+    var a = state.judged.slice();
+    a[+el.dataset.house] = el.dataset.right === "1";
+    setState({ judged: a });
+  },
+  finishFinal: function () {
+    var next = state.scores.map(function (sc, i) {
+      var w = parseInt(state.wagers[i], 10) || 0;
+      return state.judged[i] ? sc + w : sc - w;
+    });
+    setState({ before: state.scores.slice(), scores: next, finalStep: "results" });
+  }
+};
+
+// ---------- Views ----------
+function viewHeader() {
+  var cards = HOUSES.map(function (h, i) {
+    return '<div class="score"><span class="bar" style="background:' + h.color + '"></span>' +
+      '<span class="score-name">' + h.name + '</span><span class="score-num">' + state.scores[i] + '</span></div>';
+  }).join("");
+  return '<header class="top"><h1>Quizzards</h1><div class="scores">' + cards +
+    '<button class="btn ghost" data-action="reset">New game</button></div></header>';
+}
+
+function viewBoard() {
+  var heads = CATS.map(function (c) { return '<div class="head">' + esc(c.name) + '</div>'; }).join("");
+  var tiles = "";
+  for (var v = 1; v <= 10; v++) {
+    for (var ci = 0; ci < CATS.length; ci++) {
+      if (state.used[ci + "-" + v]) {
+        tiles += '<div class="tile used" aria-hidden="true"></div>';
+      } else {
+        tiles += '<button class="tile" data-action="pick" data-cat="' + ci + '" data-v="' + v + '" aria-label="' +
+          esc(CATS[ci].name) + ' for ' + v + (v === 1 ? ' point' : ' points') + '">' + v + '</button>';
+      }
+    }
+  }
+  var done = usedCount() === CATS.length * 10;
+  var finalBlock = done
+    ? '<div class="cleared"><div><span class="eyebrow accent">Board cleared</span><span class="cleared-text">Time for the final question.</span></div>' +
+      '<button class="btn gold" data-action="startFinal">Go to the final question</button></div>'
+    : '<button class="btn ghost right" data-action="startFinal">Skip to the final question</button>';
+  return '<section class="stack">' +
+    '<div class="board-intro"><p class="muted">Pick a category and a point value. 1 is the easiest question and 10 is the hardest.</p>' +
+    '<span class="muted small">' + TOTAL_QUESTIONS + ' questions in the library · shuffled for this game</span></div>' +
+    '<div class="board-scroll"><div class="board">' + heads + tiles + '</div></div>' + finalBlock + '</section>';
+}
+
+function viewQuestion() {
+  var c = CATS[state.cat];
+  var pair = c.qs[state.v - 1][state.deal[state.cat][state.v - 1]];
+  var dots = "";
+  for (var d = 1; d <= 10; d++) dots += '<span class="dot" style="background:' + (d <= state.v ? "var(--accent)" : "#3A4266") + '"></span>';
+  var body;
+  if (!state.revealed) {
+    body = '<button class="btn gold big" data-action="reveal">Reveal answer</button>';
+  } else {
+    var houseBtns = HOUSES.map(function (h, i) {
+      return '<button class="btn house" data-action="award" data-team="' + i + '"><span class="pip" style="background:' + h.color + '"></span>' +
+        h.name + ' +' + state.v + '</button>';
+    }).join("");
+    body = '<div class="answer"><span class="eyebrow">Answer</span><span class="answer-text">' + esc(pair[1]) + '</span></div>' +
+      '<div class="stack-sm"><span class="label">Which house got it?</span><div class="row">' + houseBtns +
+      '<button class="btn ghost" data-action="award" data-team="-1">No one</button></div></div>';
+  }
+  return '<section class="narrow"><button class="back" data-action="back">' +
+    '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>Back to the board</button>' +
+    '<div class="card"><div class="meta"><span class="chip">' + esc(c.name) + '</span><div class="meta-right"><span class="muted small">Difficulty</span>' +
+    '<span class="dots">' + dots + '</span><span class="pts">' + state.v + (state.v === 1 ? ' point' : ' points') + '</span></div></div>' +
+    '<p class="question">' + esc(pair[0]) + '</p>' + body + '</div></section>';
+}
+
+function viewFinal() {
+  var fq = FINALS[state.finalIdx];
+  var inner = "";
+  if (state.finalStep === "wager") {
+    var cards = HOUSES.map(function (h, i) {
+      return '<div class="wager"><span class="bar" style="background:' + h.color + '"></span>' +
+        '<span class="wager-name">' + h.name + '</span><span class="muted small pad">Score ' + state.scores[i] + ' · max wager ' + maxWager(i) + '</span>' +
+        '<label class="label pad" for="wager-' + i + '">Wager</label>' +
+        '<input id="wager-' + i + '" data-wager="' + i + '" type="number" min="0" max="' + maxWager(i) + '" inputmode="numeric" value="' + esc(state.wagers[i]) + '"></div>';
+    }).join("");
+    inner = '<p class="muted lead">Each house secretly writes down a wager, from 0 up to its current score. A house with fewer than 10 points can wager up to 10. Enter the wagers, then show the question. A right answer adds the wager, and a wrong one takes it away.</p>' +
+      '<div class="wagers">' + cards + '</div><button class="btn gold big" data-action="lockWagers">Lock wagers and show the question</button>';
+  } else if (state.finalStep === "question") {
+    inner = '<p class="question">' + esc(fq.q) + '</p><p class="muted">Each house has 30 seconds to write down its answer.</p>' +
+      '<button class="btn gold big" data-action="revealFinal">Reveal answer</button>';
+  } else if (state.finalStep === "judge") {
+    var rows = HOUSES.map(function (h, i) {
+      var j = state.judged[i];
+      var w = parseInt(state.wagers[i], 10) || 0;
+      return '<div class="judge-row"><div class="row-left"><span class="pip" style="background:' + h.color + '"></span><strong>' + h.name + '</strong>' +
+        '<span class="muted">wagered ' + w + '</span></div><div class="row">' +
+        '<button class="btn judge' + (j === true ? ' right-on' : '') + '" aria-pressed="' + (j === true) + '" data-action="judge" data-house="' + i + '" data-right="1">Right +' + w + '</button>' +
+        '<button class="btn judge' + (j === false ? ' wrong-on' : '') + '" aria-pressed="' + (j === false) + '" data-action="judge" data-house="' + i + '" data-right="0">Wrong −' + w + '</button></div></div>';
+    }).join("");
+    var all = state.judged.every(function (x) { return x !== null; });
+    inner = '<p class="question">' + esc(fq.q) + '</p>' +
+      '<div class="answer"><span class="eyebrow">Answer</span><span class="answer-text">' + esc(fq.a) + '</span></div>' +
+      '<span class="label">Mark each house right or wrong</span><div class="stack-sm">' + rows + '</div>' +
+      (all ? '<button class="btn gold big" data-action="finishFinal">Crown the House Cup winner</button>'
+           : '<span class="muted">Mark every house to see the winner.</span>');
+  } else {
+    var idx = [0, 1, 2, 3].sort(function (a, b) { return state.scores[b] - state.scores[a]; });
+    var places = ["1st", "2nd", "3rd", "4th"];
+    var rank = idx.map(function (i, k) {
+      var dd = state.scores[i] - state.before[i];
+      var delta = dd > 0 ? "+" + dd : dd < 0 ? "−" + Math.abs(dd) : "±0";
+      return '<div class="rank"><span class="place">' + places[k] + '</span><span class="pip big-pip" style="background:' + HOUSES[i].color + '"></span>' +
+        '<span class="rank-name">' + HOUSES[i].name + '</span><span class="muted">final question ' + delta + '</span><span class="rank-score">' + state.scores[i] + '</span></div>';
+    }).join("");
+    var top = Math.max.apply(null, state.scores);
+    var names = HOUSES.filter(function (h, i) { return state.scores[i] === top; }).map(function (h) { return h.name; });
+    var winner = names.length === 1 ? names[0] + " wins the House Cup!"
+      : names.length === 4 ? "A four-way tie!"
+      : "It's a tie: " + names.slice(0, -1).join(", ") + " and " + names[names.length - 1] + "!";
+    inner = '<div class="winner"><span class="eyebrow">The House Cup</span><span class="winner-text">' + esc(winner) + '</span></div>' +
+      '<div class="stack-sm">' + rank + '</div><button class="btn gold big center" data-action="reset">Play again</button>';
+  }
+  return '<section class="narrow wide"><div class="card final"><div class="meta"><span class="final-title">Final Question</span>' +
+    '<span class="chip">Category: ' + esc(fq.cat) + '</span></div>' + inner + '</div></section>';
+}
+
+function render() {
+  var main = state.screen === "board" ? viewBoard() : state.screen === "question" ? viewQuestion() : viewFinal();
+  document.getElementById("app").innerHTML = viewHeader() + main;
+  var key = state.screen + "/" + state.finalStep;
+  if (key !== lastView) window.scrollTo(0, 0);
+  lastView = key;
+}
+
+// ---------- Wiring ----------
+document.addEventListener("click", function (e) {
+  var el = e.target.closest("[data-action]");
+  if (el && actions[el.dataset.action]) actions[el.dataset.action](el);
+});
+document.addEventListener("input", function (e) {
+  var i = e.target.dataset && e.target.dataset.wager;
+  if (i !== undefined) state.wagers[+i] = e.target.value; // no re-render, so typing keeps focus
+});
+
+state = fresh();
+render();
+</script>
+</body>
+</html>
