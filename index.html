@@ -82,7 +82,33 @@ h1{margin:0;font-family:Cinzel,Georgia,serif;font-weight:700;font-size:44px;line
 .place{width:36px;font-size:22px;font-weight:700;color:var(--muted)}
 .rank-name{flex:1 1 auto;font-size:20px;font-weight:700}
 .rank-score{min-width:56px;text-align:right;font-size:28px;font-weight:700}
-@media (max-width:640px){h1{font-size:34px}.card{padding:24px}.question{font-size:26px}.winner-text{font-size:30px}.rank{flex-wrap:wrap}}
+.header-btns{display:flex;gap:8px;align-self:center}
+.score.is-turn{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
+.btn.left{align-self:flex-start}
+.name-row{display:flex;gap:10px;flex-wrap:wrap}
+.name-row input{flex:1 1 240px;min-height:48px;padding:0 14px;background:var(--bg);color:var(--text);border:1px solid var(--line2);border-radius:10px;font-family:inherit;font-size:17px}
+.name-row input::placeholder{color:#8A90A8}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.name-chip{display:inline-flex;align-items:center;gap:4px;padding:4px 4px 4px 14px;background:var(--chip);border-radius:999px;font-size:15px;font-weight:600}
+.chip-x{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:16px;background:transparent;border:none;color:var(--muted)}
+.chip-x:hover{color:var(--text);background:#343B5E}
+.hat-card{align-items:center;text-align:center;padding:56px 32px}
+.hat-name{font-size:40px;font-weight:700}
+.hat-thinking{font-size:24px;font-style:italic;color:var(--muted);min-height:64px;display:flex;align-items:center;animation:pulse 1s ease-in-out infinite alternate}
+.hat-house{font-family:Cinzel,Georgia,serif;font-weight:700;font-size:56px;min-height:64px;letter-spacing:.04em;animation:pop .35s ease-out}
+.center-row{justify-content:center}
+.rosters{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.roster{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.roster-name{padding:12px 18px 4px;font-family:Cinzel,Georgia,serif;font-weight:700;font-size:22px}
+.roster ul{margin:0;padding:4px 18px 18px 36px;display:flex;flex-direction:column;gap:4px;font-size:17px}
+.turn-banner{display:flex;align-items:center;gap:14px;padding:16px 22px;background:var(--card);border:2px solid;border-radius:16px}
+.turn-text{display:flex;flex-direction:column;gap:2px}
+.turn-name{font-size:22px;font-weight:700}
+.btn.picker{border-color:var(--accent)}
+@keyframes pulse{from{opacity:.55}to{opacity:1}}
+@keyframes pop{from{transform:scale(.7);opacity:0}to{transform:scale(1);opacity:1}}
+@media (prefers-reduced-motion:reduce){.hat-thinking,.hat-house{animation:none}}
+@media (max-width:640px){h1{font-size:34px}.card{padding:24px}.question{font-size:26px}.winner-text{font-size:30px}.hat-house{font-size:40px}.hat-name{font-size:30px}.rank{flex-wrap:wrap}}
 </style>
 </head>
 <body>
@@ -324,9 +350,35 @@ var TOTAL_QUESTIONS = CATS.reduce(function (sum, c) {
 }, 0);
 
 
+// ---------- Players and houses ----------
+var PLAYERS_KEY = "quizzards-players-v1";
+function loadPlayers() {
+  try { var p = JSON.parse(window.localStorage.getItem(PLAYERS_KEY) || "[]"); return Array.isArray(p) ? p : []; } catch (e) { return []; }
+}
+function savePlayers(p) {
+  try { window.localStorage.setItem(PLAYERS_KEY, JSON.stringify(p)); } catch (e) {}
+}
+function shuffle(arr) {
+  var a = arr.slice();
+  for (var i = a.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var t = a[i]; a[i] = a[j]; a[j] = t;
+  }
+  return a;
+}
+
+// Teams live outside the game state so "New game" keeps everyone in their houses.
+var teams = { players: loadPlayers(), sorted: null, active: [0, 1, 2, 3] };
+
+function membersOf(h) {
+  if (!teams.sorted) return [];
+  return teams.sorted.filter(function (p) { return p.house === h; }).map(function (p) { return p.name; });
+}
+
 // ---------- Game state ----------
 var state;
 var lastView = "";
+var hatTimer = null;
 
 function fresh() {
   var seen = loadSeen();
@@ -336,7 +388,9 @@ function fresh() {
   var finalIdx = pickUnseen(FINALS.length, "F-", seen);
   saveSeen(seen);
   return {
-    screen: "board", cat: 0, v: 1, revealed: false,
+    screen: "board", setupStep: "names", revealIdx: 0, thinking: false,
+    cat: 0, v: 1, revealed: false,
+    turn: Math.floor(Math.random() * teams.active.length),
     scores: [0, 0, 0, 0], used: {}, deal: deal, finalIdx: finalIdx,
     finalStep: "wager", wagers: ["", "", "", ""], judged: [null, null, null, null], before: [0, 0, 0, 0]
   };
@@ -354,6 +408,7 @@ function markSeen(key) {
 }
 
 function maxWager(i) { return Math.max(state.scores[i], 10); }
+function turnHouse() { return teams.active[state.turn % teams.active.length]; }
 
 function esc(t) {
   return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -361,8 +416,59 @@ function esc(t) {
 
 function usedCount() { return Object.keys(state.used).length; }
 
+function hatThink() {
+  clearTimeout(hatTimer);
+  setState({ thinking: true });
+  hatTimer = setTimeout(function () { setState({ thinking: false }); }, 1400);
+}
+
+function addNameFromInput() {
+  var input = document.getElementById("name-input");
+  if (!input) return;
+  var names = input.value.split(",").map(function (n) { return n.trim().slice(0, 40); }).filter(Boolean);
+  if (!names.length) return;
+  teams.players = teams.players.concat(names);
+  savePlayers(teams.players);
+  render();
+  var again = document.getElementById("name-input");
+  if (again) again.focus();
+}
+
 // ---------- Actions ----------
 var actions = {
+  addName: function () { addNameFromInput(); },
+  removeName: function (el) {
+    teams.players.splice(+el.dataset.i, 1);
+    savePlayers(teams.players);
+    render();
+  },
+  clearNames: function () { teams.players = []; savePlayers(teams.players); render(); },
+  sortPlayers: function () {
+    if (!teams.players.length) return;
+    var names = shuffle(teams.players);
+    var order = shuffle([0, 1, 2, 3]);
+    teams.sorted = names.map(function (n, i) { return { name: n, house: order[i % 4] }; });
+    teams.active = [0, 1, 2, 3].filter(function (h) { return membersOf(h).length > 0; });
+    setState({ setupStep: "reveal", revealIdx: 0 });
+    hatThink();
+  },
+  nextReveal: function () {
+    if (state.revealIdx < teams.sorted.length - 1) {
+      setState({ revealIdx: state.revealIdx + 1 });
+      hatThink();
+    } else {
+      setState({ setupStep: "rosters", thinking: false });
+    }
+  },
+  skipReveal: function () { clearTimeout(hatTimer); setState({ setupStep: "rosters", thinking: false }); },
+  skipSorting: function () {
+    teams.sorted = null;
+    teams.active = [0, 1, 2, 3];
+    state = fresh();
+    render();
+  },
+  startGame: function () { state = fresh(); render(); },
+  players: function () { setState({ screen: "setup", setupStep: "names" }); },
   reset: function () { state = fresh(); render(); },
   pick: function (el) { setState({ screen: "question", cat: +el.dataset.cat, v: +el.dataset.v, revealed: false }); },
   reveal: function () { setState({ revealed: true }); },
@@ -374,7 +480,7 @@ var actions = {
     var used = Object.assign({}, state.used);
     used[state.cat + "-" + state.v] = true;
     markSeen(state.cat + "-" + (state.v - 1) + "-" + state.deal[state.cat][state.v - 1]);
-    setState({ scores: scores, used: used, screen: "board", revealed: false });
+    setState({ scores: scores, used: used, screen: "board", revealed: false, turn: (state.turn + 1) % teams.active.length });
   },
   startFinal: function () { setState({ screen: "final", finalStep: "wager", wagers: ["", "", "", ""], judged: [null, null, null, null] }); },
   lockWagers: function () {
@@ -393,6 +499,7 @@ var actions = {
   },
   finishFinal: function () {
     var next = state.scores.map(function (sc, i) {
+      if (teams.active.indexOf(i) < 0) return sc;
       var w = parseInt(state.wagers[i], 10) || 0;
       return state.judged[i] ? sc + w : sc - w;
     });
@@ -402,12 +509,75 @@ var actions = {
 
 // ---------- Views ----------
 function viewHeader() {
-  var cards = HOUSES.map(function (h, i) {
-    return '<div class="score"><span class="bar" style="background:' + h.color + '"></span>' +
+  var playing = state.screen !== "setup";
+  var cards = playing ? teams.active.map(function (i) {
+    var h = HOUSES[i];
+    var isTurn = state.screen === "board" && i === turnHouse();
+    return '<div class="score' + (isTurn ? ' is-turn' : '') + '"><span class="bar" style="background:' + h.color + '"></span>' +
       '<span class="score-name">' + h.name + '</span><span class="score-num">' + state.scores[i] + '</span></div>';
+  }).join("") : "";
+  var buttons = playing
+    ? '<div class="header-btns"><button class="btn ghost" data-action="players">Players</button><button class="btn ghost" data-action="reset">New game</button></div>'
+    : "";
+  return '<header class="top"><h1>Quizzards</h1><div class="scores">' + cards + buttons + '</div></header>';
+}
+
+function viewSetup() {
+  if (state.setupStep === "names") {
+    var chips = teams.players.map(function (n, i) {
+      return '<span class="name-chip">' + esc(n) + '<button class="chip-x" data-action="removeName" data-i="' + i + '" aria-label="Remove ' + esc(n) + '">' +
+        '<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></span>';
+    }).join("");
+    var count = teams.players.length;
+    return '<section class="narrow"><div class="card">' +
+      '<div class="stack-sm"><span class="final-title">The Sorting Ceremony</span>' +
+      '<p class="muted lead">Add every player, then let the Sorting Hat put everyone into a house. Houses are kept as even as possible. With fewer than four players, only the houses that get someone will play.</p></div>' +
+      '<div class="stack-sm"><label class="label" for="name-input">Player name</label>' +
+      '<div class="name-row"><input id="name-input" type="text" maxlength="200" autocomplete="off" placeholder="Type a name and press Enter">' +
+      '<button class="btn" data-action="addName">Add</button></div>' +
+      '<span class="muted small">Tip: paste several names at once, separated by commas.</span></div>' +
+      (count ? '<div class="stack-sm"><span class="label">' + count + (count === 1 ? ' player' : ' players') + '</span><div class="chips">' + chips + '</div>' +
+        '<button class="btn ghost left" data-action="clearNames">Clear all</button></div>' : '') +
+      '<div class="row">' +
+      (count ? '<button class="btn gold big" data-action="sortPlayers">Sort everyone</button>' : '') +
+      '<button class="btn ghost" data-action="skipSorting">Skip, we already have teams</button></div>' +
+      '</div></section>';
+  }
+  if (state.setupStep === "reveal") {
+    var p = teams.sorted[state.revealIdx];
+    var total = teams.sorted.length;
+    var last = state.revealIdx === total - 1;
+    var result = state.thinking
+      ? '<span class="hat-thinking">Hmm, difficult. Very difficult…</span>'
+      : '<span class="hat-house" style="color:' + HOUSES[p.house].color + '">' + HOUSES[p.house].name.toUpperCase() + '!</span>';
+    return '<section class="narrow"><div class="card hat-card">' +
+      '<span class="eyebrow">Player ' + (state.revealIdx + 1) + ' of ' + total + '</span>' +
+      '<span class="hat-name">' + esc(p.name) + '</span>' + result +
+      '<div class="row center-row">' +
+      (state.thinking ? '' : '<button class="btn gold big" data-action="nextReveal">' + (last ? 'See the houses' : 'Next player') + '</button>') +
+      '<button class="btn ghost" data-action="skipReveal">Skip to the results</button></div>' +
+      '</div></section>';
+  }
+  var cols = teams.active.map(function (h) {
+    var names = membersOf(h).map(function (n) { return '<li>' + esc(n) + '</li>'; }).join("");
+    return '<div class="roster"><span class="bar" style="background:' + HOUSES[h].color + '"></span>' +
+      '<span class="roster-name">' + HOUSES[h].name + '</span><ul>' + names + '</ul></div>';
   }).join("");
-  return '<header class="top"><h1>Quizzards</h1><div class="scores">' + cards +
-    '<button class="btn ghost" data-action="reset">New game</button></div></header>';
+  return '<section class="stack"><div class="stack-sm"><span class="final-title">Your houses</span>' +
+    '<p class="muted">Sit with your house. Each house takes turns picking from the board.</p></div>' +
+    '<div class="rosters">' + cols + '</div>' +
+    '<div class="row"><button class="btn gold big" data-action="startGame">Start the game</button>' +
+    '<button class="btn ghost" data-action="sortPlayers">Sort again</button>' +
+    '<button class="btn ghost" data-action="players">Edit players</button></div></section>';
+}
+
+function viewTurnBanner() {
+  var h = turnHouse();
+  var members = membersOf(h);
+  return '<div class="turn-banner" style="border-color:' + HOUSES[h].color + '"><span class="pip big-pip" style="background:' + HOUSES[h].color + '"></span>' +
+    '<div class="turn-text"><span class="turn-name">' + HOUSES[h].name + '’s turn to pick</span>' +
+    (members.length ? '<span class="muted small">' + members.map(esc).join(", ") + '</span>' : '') +
+    '</div></div>';
 }
 
 function viewBoard() {
@@ -428,7 +598,7 @@ function viewBoard() {
     ? '<div class="cleared"><div><span class="eyebrow accent">Board cleared</span><span class="cleared-text">Time for the final question.</span></div>' +
       '<button class="btn gold" data-action="startFinal">Go to the final question</button></div>'
     : '<button class="btn ghost right" data-action="startFinal">Skip to the final question</button>';
-  return '<section class="stack">' +
+  return '<section class="stack">' + (done ? '' : viewTurnBanner()) +
     '<div class="board-intro"><p class="muted">Pick a category and a point value. 1 is the easiest question and 10 is the hardest.</p>' +
     '<span class="muted small">' + TOTAL_QUESTIONS + ' questions in the library · shuffled for this game</span></div>' +
     '<div class="board-scroll"><div class="board">' + heads + tiles + '</div></div>' + finalBlock + '</section>';
@@ -437,18 +607,26 @@ function viewBoard() {
 function viewQuestion() {
   var c = CATS[state.cat];
   var pair = c.qs[state.v - 1][state.deal[state.cat][state.v - 1]];
+  var th = turnHouse();
   var dots = "";
   for (var d = 1; d <= 10; d++) dots += '<span class="dot" style="background:' + (d <= state.v ? "var(--accent)" : "#3A4266") + '"></span>';
   var body;
   if (!state.revealed) {
-    body = '<button class="btn gold big" data-action="reveal">Reveal answer</button>';
+    var stealNote = teams.active.length > 1
+      ? ' Think they’re wrong? Raise your hand to steal, and give your answer before the reveal.'
+      : '';
+    body = '<p class="muted lead"><strong class="turn-inline" style="color:' + HOUSES[th].color + '">' + HOUSES[th].name + '</strong> answers first.' + stealNote + '</p>' +
+      '<button class="btn gold big" data-action="reveal">Reveal answer</button>';
   } else {
-    var houseBtns = HOUSES.map(function (h, i) {
-      return '<button class="btn house" data-action="award" data-team="' + i + '"><span class="pip" style="background:' + h.color + '"></span>' +
-        h.name + ' +' + state.v + '</button>';
+    var order = [th].concat(teams.active.filter(function (h) { return h !== th; }));
+    var houseBtns = order.map(function (i) {
+      var h = HOUSES[i];
+      var label = i === th ? h.name + ' +' + state.v : h.name + ' steals +' + state.v;
+      return '<button class="btn house' + (i === th ? ' picker' : '') + '" data-action="award" data-team="' + i + '"><span class="pip" style="background:' + h.color + '"></span>' +
+        label + '</button>';
     }).join("");
     body = '<div class="answer"><span class="eyebrow">Answer</span><span class="answer-text">' + esc(pair[1]) + '</span></div>' +
-      '<div class="stack-sm"><span class="label">Which house got it?</span><div class="row">' + houseBtns +
+      '<div class="stack-sm"><span class="label">Who got it?</span><div class="row">' + houseBtns +
       '<button class="btn ghost" data-action="award" data-team="-1">No one</button></div></div>';
   }
   return '<section class="narrow"><button class="back" data-action="back">' +
@@ -460,9 +638,11 @@ function viewQuestion() {
 
 function viewFinal() {
   var fq = FINALS[state.finalIdx];
+  var act = teams.active;
   var inner = "";
   if (state.finalStep === "wager") {
-    var cards = HOUSES.map(function (h, i) {
+    var cards = act.map(function (i) {
+      var h = HOUSES[i];
       return '<div class="wager"><span class="bar" style="background:' + h.color + '"></span>' +
         '<span class="wager-name">' + h.name + '</span><span class="muted small pad">Score ' + state.scores[i] + ' · max wager ' + maxWager(i) + '</span>' +
         '<label class="label pad" for="wager-' + i + '">Wager</label>' +
@@ -474,7 +654,8 @@ function viewFinal() {
     inner = '<p class="question">' + esc(fq.q) + '</p><p class="muted">Each house has 30 seconds to write down its answer.</p>' +
       '<button class="btn gold big" data-action="revealFinal">Reveal answer</button>';
   } else if (state.finalStep === "judge") {
-    var rows = HOUSES.map(function (h, i) {
+    var rows = act.map(function (i) {
+      var h = HOUSES[i];
       var j = state.judged[i];
       var w = parseInt(state.wagers[i], 10) || 0;
       return '<div class="judge-row"><div class="row-left"><span class="pip" style="background:' + h.color + '"></span><strong>' + h.name + '</strong>' +
@@ -482,14 +663,14 @@ function viewFinal() {
         '<button class="btn judge' + (j === true ? ' right-on' : '') + '" aria-pressed="' + (j === true) + '" data-action="judge" data-house="' + i + '" data-right="1">Right +' + w + '</button>' +
         '<button class="btn judge' + (j === false ? ' wrong-on' : '') + '" aria-pressed="' + (j === false) + '" data-action="judge" data-house="' + i + '" data-right="0">Wrong −' + w + '</button></div></div>';
     }).join("");
-    var all = state.judged.every(function (x) { return x !== null; });
+    var all = act.every(function (i) { return state.judged[i] !== null; });
     inner = '<p class="question">' + esc(fq.q) + '</p>' +
       '<div class="answer"><span class="eyebrow">Answer</span><span class="answer-text">' + esc(fq.a) + '</span></div>' +
       '<span class="label">Mark each house right or wrong</span><div class="stack-sm">' + rows + '</div>' +
       (all ? '<button class="btn gold big" data-action="finishFinal">Crown the House Cup winner</button>'
            : '<span class="muted">Mark every house to see the winner.</span>');
   } else {
-    var idx = [0, 1, 2, 3].sort(function (a, b) { return state.scores[b] - state.scores[a]; });
+    var idx = act.slice().sort(function (a, b) { return state.scores[b] - state.scores[a]; });
     var places = ["1st", "2nd", "3rd", "4th"];
     var rank = idx.map(function (i, k) {
       var dd = state.scores[i] - state.before[i];
@@ -497,10 +678,10 @@ function viewFinal() {
       return '<div class="rank"><span class="place">' + places[k] + '</span><span class="pip big-pip" style="background:' + HOUSES[i].color + '"></span>' +
         '<span class="rank-name">' + HOUSES[i].name + '</span><span class="muted">final question ' + delta + '</span><span class="rank-score">' + state.scores[i] + '</span></div>';
     }).join("");
-    var top = Math.max.apply(null, state.scores);
-    var names = HOUSES.filter(function (h, i) { return state.scores[i] === top; }).map(function (h) { return h.name; });
+    var top = Math.max.apply(null, act.map(function (i) { return state.scores[i]; }));
+    var names = act.filter(function (i) { return state.scores[i] === top; }).map(function (i) { return HOUSES[i].name; });
     var winner = names.length === 1 ? names[0] + " wins the House Cup!"
-      : names.length === 4 ? "A four-way tie!"
+      : names.length === act.length && act.length > 2 ? "Everyone ties!"
       : "It's a tie: " + names.slice(0, -1).join(", ") + " and " + names[names.length - 1] + "!";
     inner = '<div class="winner"><span class="eyebrow">The House Cup</span><span class="winner-text">' + esc(winner) + '</span></div>' +
       '<div class="stack-sm">' + rank + '</div><button class="btn gold big center" data-action="reset">Play again</button>';
@@ -510,9 +691,12 @@ function viewFinal() {
 }
 
 function render() {
-  var main = state.screen === "board" ? viewBoard() : state.screen === "question" ? viewQuestion() : viewFinal();
+  var main = state.screen === "setup" ? viewSetup()
+    : state.screen === "board" ? viewBoard()
+    : state.screen === "question" ? viewQuestion()
+    : viewFinal();
   document.getElementById("app").innerHTML = viewHeader() + main;
-  var key = state.screen + "/" + state.finalStep;
+  var key = state.screen + "/" + state.finalStep + "/" + state.setupStep;
   if (key !== lastView) window.scrollTo(0, 0);
   lastView = key;
 }
@@ -526,8 +710,12 @@ document.addEventListener("input", function (e) {
   var i = e.target.dataset && e.target.dataset.wager;
   if (i !== undefined) state.wagers[+i] = e.target.value; // no re-render, so typing keeps focus
 });
+document.addEventListener("keydown", function (e) {
+  if (e.key === "Enter" && e.target.id === "name-input") { e.preventDefault(); addNameFromInput(); }
+});
 
 state = fresh();
+state.screen = "setup";
 render();
 </script>
 </body>
