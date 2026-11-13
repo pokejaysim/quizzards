@@ -599,8 +599,6 @@ function viewBoard() {
       '<button class="btn gold" data-action="startFinal">Go to the final question</button></div>'
     : '<button class="btn ghost right" data-action="startFinal">Skip to the final question</button>';
   return '<section class="stack">' + (done ? '' : viewTurnBanner()) +
-    '<div class="board-intro"><p class="muted">Pick a category and a point value. 1 is the easiest question and 10 is the hardest.</p>' +
-    '<span class="muted small">' + TOTAL_QUESTIONS + ' questions in the library · shuffled for this game</span></div>' +
     '<div class="board-scroll"><div class="board">' + heads + tiles + '</div></div>' + finalBlock + '</section>';
 }
 
