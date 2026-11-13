@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Quizzards</title>
+<link rel="icon" type="image/svg+xml" href="assets/emblem.svg">
 <meta name="description" content="A wizard-themed trivia board game for four houses.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,11 +12,12 @@
 <style>
 :root{--accent:#E2B857;--bg:#14182B;--card:#1E2440;--line:#2E3558;--line2:#3A4266;--chip:#2A3156;--text:#F3EFE6;--muted:#A9AEC4}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif}
+body{margin:0;min-height:100vh;color:var(--text);font-family:Inter,system-ui,sans-serif;background:linear-gradient(rgba(20,24,43,.3),rgba(20,24,43,.3)),url(assets/background.jpg) center bottom/cover no-repeat fixed,var(--bg)}
+h1 .emblem{width:52px;height:52px;flex:none}
 button{font-family:inherit;cursor:pointer}
 #app{max-width:1200px;margin:0 auto;padding:36px 24px 56px;display:flex;flex-direction:column;gap:28px}
 .top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:20px}
-h1{margin:0;font-family:Cinzel,Georgia,serif;font-weight:700;font-size:44px;line-height:1.1;color:var(--accent)}
+h1{display:flex;align-items:center;gap:14px;margin:0;font-family:Cinzel,Georgia,serif;font-weight:700;font-size:44px;line-height:1.1;color:var(--accent)}
 .scores{display:flex;flex-wrap:wrap;align-items:stretch;gap:12px}
 .score,.wager{display:flex;flex-direction:column;gap:4px;min-width:132px;padding:0 0 12px;background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
 .bar{height:5px}
@@ -108,7 +110,7 @@ h1{margin:0;font-family:Cinzel,Georgia,serif;font-weight:700;font-size:44px;line
 @keyframes pulse{from{opacity:.55}to{opacity:1}}
 @keyframes pop{from{transform:scale(.7);opacity:0}to{transform:scale(1);opacity:1}}
 @media (prefers-reduced-motion:reduce){.hat-thinking,.hat-house{animation:none}}
-@media (max-width:640px){h1{font-size:34px}.card{padding:24px}.question{font-size:26px}.winner-text{font-size:30px}.hat-house{font-size:40px}.hat-name{font-size:30px}.rank{flex-wrap:wrap}}
+@media (max-width:640px){h1{font-size:34px}h1 .emblem{width:40px;height:40px}.card{padding:24px}.question{font-size:26px}.winner-text{font-size:30px}.hat-house{font-size:40px}.hat-name{font-size:30px}.rank{flex-wrap:wrap}}
 </style>
 </head>
 <body>
@@ -519,7 +521,7 @@ function viewHeader() {
   var buttons = playing
     ? '<div class="header-btns"><button class="btn ghost" data-action="players">Players</button><button class="btn ghost" data-action="reset">New game</button></div>'
     : "";
-  return '<header class="top"><h1>Quizzards</h1><div class="scores">' + cards + buttons + '</div></header>';
+  return '<header class="top"><h1><img class="emblem" src="assets/emblem.svg" alt="">Quizzards</h1><div class="scores">' + cards + buttons + '</div></header>';
 }
 
 function viewSetup() {

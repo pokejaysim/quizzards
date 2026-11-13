@@ -1,0 +1,10 @@
+<svg viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg" width="1024" height="1024">
+  <title>Question-mark wizard hat</title>
+  <g id="emblem" stroke="#E2B857" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
+    <path id="sparkle" d="M512 46 Q522 117 586 128 Q522 139 512 210 Q502 139 438 128 Q502 117 512 46Z" />
+    <path id="hat" d="M278 795 C328 695 374 588 421 511 C451 461 487 421 535 383 C575 352 609 333 607 302 C605 271 581 253 550 253 C518 253 491 272 479 305 C473 323 451 327 438 315 C412 292 429 252 453 231 C486 202 531 196 574 206 C628 218 661 254 665 301 C671 358 637 391 590 419 C560 437 540 453 541 474 C612 562 679 681 746 795" />
+    <path id="brim" d="M278 795 C175 815 111 847 111 881 C111 937 291 973 512 973 C733 973 913 937 913 881 C913 847 849 815 746 795 C687 825 603 840 512 840 C421 840 337 825 278 795Z" />
+    <path id="band" d="M316 716 Q512 780 708 716" />
+    <circle id="question-dot" cx="512" cy="546" r="20" fill="#E2B857" stroke="none" />
+  </g>
+</svg>
