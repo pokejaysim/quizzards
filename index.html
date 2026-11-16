@@ -132,6 +132,10 @@ h1{display:flex;align-items:center;gap:14px;margin:0;font-family:Cinzel,Georgia,
 .join-code{font-family:Cinzel,Georgia,serif;font-weight:700;font-size:56px;letter-spacing:.14em;line-height:1.1;color:var(--accent)}
 .buzz-banner{display:flex;flex-wrap:wrap;align-items:center;gap:14px;padding:14px 20px;background:var(--bg);border:2px solid;border-radius:16px;animation:pop .3s ease-out}
 .buzz-banner .turn-text{flex:1 1 auto}
+.wager-in{padding-top:6px;font-size:15px;font-weight:600;color:var(--accent)}
+.wager-clear{margin:0 18px;align-self:flex-start}
+.phone-answer{font-size:17px;font-weight:600;color:var(--accent)}
+.p-form{display:flex;flex-direction:column;gap:10px;width:100%;align-items:stretch}
 body.phone #app{max-width:520px;padding:20px 16px 40px;gap:16px}
 .p-top{display:flex;justify-content:space-between;align-items:center}
 .p-brand{font-family:Cinzel,Georgia,serif;font-weight:700;font-size:24px;color:var(--accent)}
@@ -691,7 +695,8 @@ var ROOM = (function () {
   try { var r = new URLSearchParams(window.location.search).get("room"); return r ? r.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 6) : ""; } catch (e) { return ""; }
 })();
 var phoneMode = !!ROOM;
-var net = { on: false, code: "", channel: null, status: "off", ids: {}, buzz: null, beat: null, qr: "" };
+var net = { on: false, code: "", channel: null, status: "off", ids: {}, buzz: null, beat: null, qr: "", fin: { wagerBy: [null, null, null, null], answers: [null, null, null, null] } };
+function resetFin() { net.fin = { wagerBy: [null, null, null, null], answers: [null, null, null, null] }; }
 
 function loadScript(src) {
   return new Promise(function (resolve, reject) {
@@ -748,7 +753,14 @@ function hostSnapshot() {
   });
   return {
     t: "state", phase: phase, players: players, scores: state.scores, active: teams.active,
-    turn: turnHouse(), buzz: net.buzz, winners: phase === "results" ? winners() : null
+    turn: turnHouse(), buzz: net.buzz, winners: phase === "results" ? winners() : null,
+    // Only who submitted is shared, never the wager or answer itself.
+    fin: state.screen === "final" ? {
+      step: state.finalStep,
+      max: [0, 1, 2, 3].map(function (i) { return maxWager(i); }),
+      wagerBy: net.fin.wagerBy,
+      answerBy: net.fin.answers.map(function (a) { return a ? { id: a.id, name: a.name } : null; })
+    } : null
   };
 }
 
@@ -765,6 +777,12 @@ function renderKeepingInput() {
     var again = document.getElementById("name-input");
     if (again) { again.value = typed; if (focused) again.focus(); }
   }
+}
+
+function renderKeepingFocus() {
+  var id = document.activeElement && document.activeElement.id;
+  render();
+  if (id) { var el = document.getElementById(id); if (el) el.focus(); }
 }
 
 function uniqueName(name) {
@@ -790,6 +808,25 @@ function hostOnMsg(p) {
       teams.sorted.push({ name: name, house: smallest });
     }
     renderKeepingInput();
+    return;
+  }
+  if ((p.t === "wager" || p.t === "answer") && typeof p.id === "string") {
+    var fw = net.ids[p.id];
+    var fh = fw ? houseOfName(fw) : null;
+    if (!fh || state.screen !== "final" || teams.active.indexOf(fh.house) < 0) return;
+    if (p.t === "wager" && state.finalStep === "wager") {
+      var amt = parseInt(p.amount, 10);
+      if (isNaN(amt)) return;
+      amt = Math.min(Math.max(amt, 0), maxWager(fh.house));
+      state.wagers[fh.house] = String(amt);
+      net.fin.wagerBy[fh.house] = { id: p.id, name: fw };
+      renderKeepingFocus();
+    } else if (p.t === "answer" && state.finalStep === "question") {
+      var text = String(p.text || "").replace(/\s+/g, " ").trim().slice(0, 80);
+      if (!text) return;
+      net.fin.answers[fh.house] = { id: p.id, name: fw, text: text };
+      renderKeepingFocus();
+    }
     return;
   }
   if (p.t === "buzz" && typeof p.id === "string") {
@@ -870,7 +907,7 @@ function viewBuzzBanner() {
 }
 
 // ----- Phone side -----
-var ph = { id: "", name: "", channel: null, status: "connecting", st: null, lastSeen: 0, wantJoin: false, html: "", buzzed: false };
+var ph = { id: "", name: "", channel: null, status: "connecting", st: null, lastSeen: 0, wantJoin: false, html: "", buzzed: false, myWager: null, myAnswer: null };
 
 function phoneMe() {
   if (!ph.st) return null;
@@ -937,7 +974,28 @@ function phoneView() {
   } else if (st.phase === "revealed") {
     body = '<p class="p-big">The answer is on the big screen.</p>';
   } else if (st.phase === "final") {
-    body = '<p class="p-big">Final question!</p><p class="muted">Agree on a wager and an answer with your house.</p>';
+    var f = st.fin || { step: "wager", max: [10, 10, 10, 10], wagerBy: [], answerBy: [] };
+    if (f.step === "wager") {
+      var wb = f.wagerBy[me.house];
+      var mineW = wb && wb.id === ph.id && ph.myWager !== null;
+      var wStatus = !wb ? 'Agree on a wager with your house, and keep it secret.'
+        : (mineW ? 'Your wager of ' + ph.myWager + ' is in.' : esc(wb.name) + ' set your house’s wager.') + ' You can change it until the host locks it.';
+      body = '<p class="p-big">Final question: place your wager</p><p class="muted">' + wStatus + '</p>' +
+        '<form id="p-wager" class="p-form" novalidate><label class="label" for="p-wager-in">Wager (0 to ' + f.max[me.house] + ')</label>' +
+        '<input id="p-wager-in" type="number" inputmode="numeric" min="0" max="' + f.max[me.house] + '" value="' + (mineW ? ph.myWager : '') + '">' +
+        '<button class="btn gold big p-wide" type="submit">' + (wb ? 'Change wager' : 'Lock in wager') + '</button></form>';
+    } else if (f.step === "question") {
+      var ab = f.answerBy[me.house];
+      var mineA = ab && ab.id === ph.id && ph.myAnswer !== null;
+      var aStatus = !ab ? 'Read the question on the big screen, then type your house’s answer.'
+        : (mineA ? 'Your answer is in: “' + esc(ph.myAnswer) + '”.' : esc(ab.name) + ' sent your house’s answer.') + ' You can change it until the host reveals.';
+      body = '<p class="p-big">Final question: your answer</p><p class="muted">' + aStatus + '</p>' +
+        '<form id="p-answer" class="p-form"><label class="label" for="p-answer-in">Answer</label>' +
+        '<input id="p-answer-in" type="text" maxlength="80" autocomplete="off" value="' + (mineA ? esc(ph.myAnswer) : '') + '">' +
+        '<button class="btn gold big p-wide" type="submit">' + (ab ? 'Change answer' : 'Send answer') + '</button></form>';
+    } else {
+      body = '<p class="p-big">Answers are locked.</p><p class="muted">Watch the big screen.</p>';
+    }
   } else {
     var won = st.winners && st.winners.indexOf(me.house) >= 0;
     body = won ? '<p class="p-big">' + h.name + ' wins the House Cup!</p>' : '<p class="p-big">Game over. Thanks for playing!</p>';
@@ -970,6 +1028,7 @@ function startPhone() {
     ph.lastSeen = Date.now();
     if (phoneMe()) ph.wantJoin = false;
     if (p.phase !== "question" || (hadBuzz && !p.buzz)) ph.buzzed = false;
+    if (p.phase !== "final" && p.phase !== "results") { ph.myWager = null; ph.myAnswer = null; }
     renderPhone();
   }, function (st) {
     ph.status = st;
@@ -987,6 +1046,24 @@ function startPhone() {
   }, 3000);
   document.addEventListener("submit", function (e) {
     if (e.target.id === "p-join") { e.preventDefault(); phoneJoin(document.getElementById("p-name").value); }
+    if (e.target.id === "p-wager") {
+      e.preventDefault();
+      var me = phoneMe();
+      var n = parseInt(document.getElementById("p-wager-in").value, 10);
+      if (!me || isNaN(n) || !ph.st.fin) return;
+      n = Math.min(Math.max(n, 0), ph.st.fin.max[me.house]);
+      ph.myWager = n;
+      netSend(ph.channel, { t: "wager", id: ph.id, amount: n });
+      renderPhone();
+    }
+    if (e.target.id === "p-answer") {
+      e.preventDefault();
+      var txt = document.getElementById("p-answer-in").value.replace(/\s+/g, " ").trim().slice(0, 80);
+      if (!txt) return;
+      ph.myAnswer = txt;
+      netSend(ph.channel, { t: "answer", id: ph.id, text: txt });
+      renderPhone();
+    }
   });
   document.addEventListener("click", function (e) {
     if (e.target.closest && e.target.closest("#p-buzz") && !ph.buzzed) phoneBuzz();
@@ -1045,7 +1122,8 @@ var actions = {
     net.buzz = null;
     setState({ scores: scores, used: used, screen: "board", revealed: false, turn: (state.turn + 1) % teams.active.length });
   },
-  startFinal: function () { setState({ screen: "final", finalStep: "wager", wagers: ["", "", "", ""], judged: [null, null, null, null] }); },
+  clearWager: function (el) { var i = +el.dataset.house; state.wagers[i] = ""; net.fin.wagerBy[i] = null; render(); },
+  startFinal: function () { resetFin(); setState({ screen: "final", finalStep: "wager", wagers: ["", "", "", ""], judged: [null, null, null, null] }); },
   lockWagers: function () {
     var w = state.wagers.map(function (raw, i) {
       var n = parseInt(raw, 10);
@@ -1206,18 +1284,26 @@ function viewFinal() {
   var fq = FINALS[state.finalIdx];
   var act = teams.active;
   var inner = "";
+  var phonesOn = net.on && Object.keys(net.ids).length > 0;
   if (state.finalStep === "wager") {
     var cards = act.map(function (i) {
       var h = HOUSES[i];
       return '<div class="wager"><span class="bar" style="background:' + h.color + '"></span>' +
         '<span class="wager-name">' + h.name + '</span><span class="muted small pad">Score ' + state.scores[i] + ' · max wager ' + maxWager(i) + '</span>' +
-        '<label class="label pad" for="wager-' + i + '">Wager</label>' +
-        '<input id="wager-' + i + '" data-wager="' + i + '" type="number" min="0" max="' + maxWager(i) + '" inputmode="numeric" value="' + esc(state.wagers[i]) + '"></div>';
+        (net.fin.wagerBy[i]
+          ? '<span class="pad wager-in">Wager received from ' + esc(net.fin.wagerBy[i].name) + '’s phone</span>' +
+            '<button class="btn ghost wager-clear" data-action="clearWager" data-house="' + i + '">Enter by hand instead</button>'
+          : '<label class="label pad" for="wager-' + i + '">Wager</label>' +
+            '<input id="wager-' + i + '" data-wager="' + i + '" type="number" min="0" max="' + maxWager(i) + '" inputmode="numeric" value="' + esc(state.wagers[i]) + '">') +
+        '</div>';
     }).join("");
-    inner = '<p class="muted lead">Each house secretly writes down a wager, from 0 up to its current score. A house with fewer than 10 points can wager up to 10. Enter the wagers, then show the question. A right answer adds the wager, and a wrong one takes it away.</p>' +
+    inner = '<p class="muted lead">Each house secretly writes down a wager, from 0 up to its current score. A house with fewer than 10 points can wager up to 10. Enter the wagers, then show the question. A right answer adds the wager, and a wrong one takes it away.' +
+      (phonesOn ? ' Houses with a phone can enter their wager there, and it stays hidden here.' : '') + '</p>' +
       '<div class="wagers">' + cards + '</div><button class="btn gold big" data-action="lockWagers">Lock wagers and show the question</button>';
   } else if (state.finalStep === "question") {
-    inner = '<p class="question">' + esc(fq.q) + '</p><p class="muted">Each house has 30 seconds to write down its answer.</p>' +
+    var answered = act.filter(function (i) { return net.fin.answers[i]; }).map(function (i) { return HOUSES[i].name; });
+    inner = '<p class="question">' + esc(fq.q) + '</p><p class="muted">Each house has 30 seconds to write down its answer' + (phonesOn ? ', or type it on a phone' : '') + '.</p>' +
+      (phonesOn ? '<p class="muted small">Answers in from phones: ' + (answered.length ? answered.join(", ") : 'none yet') + '</p>' : '') +
       '<button class="btn gold big" data-action="revealFinal">Reveal answer</button>';
   } else if (state.finalStep === "judge") {
     var rows = act.map(function (i) {
@@ -1225,7 +1311,9 @@ function viewFinal() {
       var j = state.judged[i];
       var w = parseInt(state.wagers[i], 10) || 0;
       return '<div class="judge-row"><div class="row-left"><span class="pip" style="background:' + h.color + '"></span><strong>' + h.name + '</strong>' +
-        '<span class="muted">wagered ' + w + '</span></div><div class="row">' +
+        '<span class="muted">wagered ' + w + '</span>' +
+        (net.fin.answers[i] ? '<span class="phone-answer">“' + esc(net.fin.answers[i].text) + '”</span>' : '') +
+        '</div><div class="row">' +
         '<button class="btn judge' + (j === true ? ' right-on' : '') + '" aria-pressed="' + (j === true) + '" data-action="judge" data-house="' + i + '" data-right="1">Right +' + w + '</button>' +
         '<button class="btn judge' + (j === false ? ' wrong-on' : '') + '" aria-pressed="' + (j === false) + '" data-action="judge" data-house="' + i + '" data-right="0">Wrong −' + w + '</button></div></div>';
     }).join("");
