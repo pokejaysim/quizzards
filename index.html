@@ -980,7 +980,7 @@ function phoneView() {
   var me = phoneMe();
   if (!me) {
     if (ph.wantJoin) return head + '<div class="p-card"><p class="p-big">Joining…</p></div>';
-    return head + '<form class="p-card" id="p-join"><label class="label" for="p-name">Your name</label>' +
+    return head + '<form class="p-card" id="p-join">' + (ph.wasIn ? '<p class="p-big">That game is over.</p><p class="muted">Join the next one?</p>' : '') + '<label class="label" for="p-name">Your name</label>' +
       '<input id="p-name" type="text" maxlength="24" autocomplete="off" value="' + esc(ph.name) + '">' +
       '<button class="btn gold big p-wide" type="submit">Join the game</button></form>';
   }
@@ -1084,7 +1084,7 @@ function startPhone() {
     if (p.t !== "state" || !Array.isArray(p.players)) return;
     ph.st = p;
     ph.lastSeen = Date.now();
-    if (phoneMe()) ph.wantJoin = false;
+    if (phoneMe()) { ph.wantJoin = false; ph.wasIn = true; }
     if (p.phase !== "question") ph.buzzed = false;
     if (p.phase !== "final" && p.phase !== "results") { ph.myWager = null; ph.myAnswer = null; }
     renderPhone();
@@ -1170,6 +1170,13 @@ var actions = {
   },
   startGame: function () { state = fresh(); render(); },
   players: function () { setState({ screen: "setup", setupStep: "names" }); },
+  newGame: function () {
+    stopConfetti(); net.buzz = []; resetFin();
+    net.ids = {}; teams.players = []; savePlayers(teams.players);
+    teams.sorted = null; teams.active = [0, 1, 2, 3];
+    state = fresh(); state.screen = "setup";
+    render();
+  },
   reset: function () { stopConfetti(); net.buzz = []; resetFin(); state = fresh(); render(); },
   pick: function (el) { net.buzz = []; setState({ screen: "question", cat: +el.dataset.cat, v: +el.dataset.v, revealed: false }); },
   reveal: function () { setState({ revealed: true }); },
@@ -1401,9 +1408,9 @@ function viewFinal() {
       : names.length === act.length && act.length > 2 ? "Everyone ties!"
       : "It's a tie: " + names.slice(0, -1).join(", ") + " and " + names[names.length - 1] + "!";
     inner = '<div class="winner"><span class="eyebrow">The House Cup</span><span class="winner-text">' + esc(winner) + '</span></div>' +
-      '<div class="stack-sm">' + rank + '</div><div class="row center-row"><button class="btn gold big" data-action="reset">Play again, same houses</button>' +
-      (teams.players.length ? '<button class="btn ghost" data-action="sortPlayers">Sort into new houses</button>' : '') + '</div>' +
-      (net.on ? '<p class="muted small center-text">Everyone on a phone stays in the game. Nobody needs to rejoin.</p>' : '');
+      '<div class="stack-sm">' + rank + '</div><div class="row center-row"><button class="btn gold big" data-action="newGame">Start a new game</button>' +
+      '<button class="btn ghost" data-action="reset">Replay with the same houses</button></div>' +
+      '<p class="muted small center-text">Starting a new game clears all players' + (net.on ? ' and sends every phone back to the join screen. The room code stays the same.' : '.') + '</p>';
   }
   return '<section class="narrow wide"><div class="card final"><div class="meta"><span class="final-title">Final Question</span>' +
     '<span class="chip">Category: ' + esc(fq.cat) + '</span></div>' + inner + '</div></section>';
