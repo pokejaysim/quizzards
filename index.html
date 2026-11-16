@@ -110,11 +110,24 @@ h1{display:flex;align-items:center;gap:14px;margin:0;font-family:Cinzel,Georgia,
 @keyframes pulse{from{opacity:.55}to{opacity:1}}
 @keyframes pop{from{transform:scale(.7);opacity:0}to{transform:scale(1);opacity:1}}
 @media (prefers-reduced-motion:reduce){.hat-thinking,.hat-house{animation:none}}
-@media (max-width:640px){h1{font-size:34px}h1 .emblem{width:40px;height:40px}.card{padding:24px}.question{font-size:26px}.winner-text{font-size:30px}.hat-house{font-size:40px}.hat-name{font-size:30px}.rank{flex-wrap:wrap}}
+.music-btn{display:inline-flex;align-items:center;gap:8px}
+#confetti{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:60;display:none}
+.splash{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:24px;background:radial-gradient(circle at 50% 40%,color-mix(in srgb,var(--house) 28%,transparent),transparent 62%),rgba(10,12,24,.97);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);animation:fadein .4s ease-out}
+.splash-title.tie{font-size:52px}
+.splash-inner{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;max-width:720px}
+.trophy{width:120px;height:120px;animation:rise .7s cubic-bezier(.2,1.4,.4,1) both}
+.splash-title{margin:0;font-family:Cinzel,Georgia,serif;font-weight:700;font-size:72px;line-height:1.05;letter-spacing:.02em;animation:pop .6s .2s cubic-bezier(.2,1.4,.4,1) both;text-shadow:0 0 40px color-mix(in srgb,var(--house) 55%,transparent)}
+.splash-score{font-size:28px;font-weight:700;color:var(--accent)}
+.splash .btn{margin-top:12px}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+@keyframes rise{from{transform:translateY(30px) scale(.8);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.splash,.trophy,.splash-title{animation:none}}
+@media (max-width:640px){h1{font-size:34px}.splash-title{font-size:44px}.splash-title.tie{font-size:34px}h1 .emblem{width:40px;height:40px}.card{padding:24px}.question{font-size:26px}.winner-text{font-size:30px}.hat-house{font-size:40px}.hat-name{font-size:30px}.rank{flex-wrap:wrap}}
 </style>
 </head>
 <body>
 <main id="app"></main>
+<canvas id="confetti" aria-hidden="true"></canvas>
 <script>
 // Question library: each category has 10 levels (1 = easiest, 10 = hardest),
 // and each level holds a pool of [question, answer] pairs. One is drawn per game.
@@ -394,7 +407,7 @@ function fresh() {
     cat: 0, v: 1, revealed: false,
     turn: Math.floor(Math.random() * teams.active.length),
     scores: [0, 0, 0, 0], used: {}, deal: deal, finalIdx: finalIdx,
-    finalStep: "wager", wagers: ["", "", "", ""], judged: [null, null, null, null], before: [0, 0, 0, 0]
+    finalStep: "wager", wagers: ["", "", "", ""], judged: [null, null, null, null], before: [0, 0, 0, 0], splash: false
   };
 }
 
@@ -434,6 +447,216 @@ function addNameFromInput() {
   render();
   var again = document.getElementById("name-input");
   if (again) again.focus();
+}
+
+// ---------- Music and sound (generated in the browser, no audio files) ----------
+var MUSIC_KEY = "quizzards-music-v1";
+var audio = { ctx: null, master: null, on: false, timer: null, nextTime: 0, step: 0 };
+var wantMusic = (function () { try { return window.localStorage.getItem(MUSIC_KEY) === "on"; } catch (e) { return false; } })();
+
+function audioInit() {
+  if (audio.ctx) return true;
+  var AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return false;
+  var ctx = new AC();
+  var master = ctx.createGain();
+  master.gain.value = 0;
+  // A soft echo gives the music-box notes a dreamy tail.
+  var delay = ctx.createDelay();
+  delay.delayTime.value = 0.36;
+  var feedback = ctx.createGain();
+  feedback.gain.value = 0.32;
+  var wet = ctx.createGain();
+  wet.gain.value = 0.28;
+  master.connect(ctx.destination);
+  master.connect(delay);
+  delay.connect(feedback);
+  feedback.connect(delay);
+  delay.connect(wet);
+  wet.connect(ctx.destination);
+  audio.ctx = ctx;
+  audio.master = master;
+  return true;
+}
+
+function midiHz(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+
+function tone(midi, when, dur, type, vol, dest) {
+  var ctx = audio.ctx;
+  var osc = ctx.createOscillator();
+  var g = ctx.createGain();
+  osc.type = type;
+  osc.frequency.value = midiHz(midi);
+  g.gain.setValueAtTime(0.0001, when);
+  g.gain.exponentialRampToValueAtTime(vol, when + 0.015);
+  g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+  osc.connect(g);
+  g.connect(dest || audio.master);
+  osc.start(when);
+  osc.stop(when + dur + 0.05);
+}
+
+// An original waltz-time loop: D minor, B-flat, G minor, A.
+var CHORDS = [
+  { bass: 38, arp: [62, 69, 74, 77, 74, 69] },
+  { bass: 34, arp: [58, 65, 70, 74, 70, 65] },
+  { bass: 43, arp: [55, 62, 67, 70, 67, 62] },
+  { bass: 45, arp: [57, 64, 69, 73, 69, 64] }
+];
+var EIGHTH = 0.3;
+
+function scheduleMusic() {
+  var ctx = audio.ctx;
+  while (audio.nextTime < ctx.currentTime + 0.4) {
+    var bar = Math.floor(audio.step / 6) % CHORDS.length;
+    var pos = audio.step % 6;
+    var chord = CHORDS[bar];
+    var t = audio.nextTime;
+    tone(chord.arp[pos], t, 1.1, "triangle", 0.22);
+    if (pos === 0) tone(chord.bass, t, EIGHTH * 6, "sine", 0.25);
+    if (pos === 3 && Math.floor(audio.step / 6) % 2 === 1) tone(chord.arp[3] + 12, t + EIGHTH / 2, 1.4, "sine", 0.08);
+    audio.nextTime += EIGHTH;
+    audio.step++;
+  }
+}
+
+function startMusic() {
+  if (!audioInit()) return;
+  audio.ctx.resume();
+  if (audio.on) return;
+  audio.on = true;
+  audio.nextTime = audio.ctx.currentTime + 0.1;
+  audio.step = 0;
+  audio.master.gain.cancelScheduledValues(audio.ctx.currentTime);
+  audio.master.gain.setTargetAtTime(0.16, audio.ctx.currentTime, 0.6);
+  audio.timer = setInterval(scheduleMusic, 100);
+  scheduleMusic();
+}
+
+function stopMusic() {
+  if (!audio.on) return;
+  audio.on = false;
+  clearInterval(audio.timer);
+  audio.master.gain.setTargetAtTime(0, audio.ctx.currentTime, 0.25);
+}
+
+// A short triumphant flourish for the winner. Plays when sound is on.
+function playFanfare() {
+  if (!wantMusic || !audioInit()) return;
+  var ctx = audio.ctx;
+  ctx.resume();
+  var out = ctx.createGain();
+  out.gain.value = 0.5;
+  var filter = ctx.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.frequency.value = 2400;
+  out.connect(filter);
+  filter.connect(ctx.destination);
+  var t = ctx.currentTime + 0.05;
+  [[62, 0, 0.18], [66, 0.18, 0.18], [69, 0.36, 0.18], [74, 0.54, 1.6]].forEach(function (n) {
+    tone(n[0], t + n[1], n[2] + 0.25, "sawtooth", 0.09, out);
+    tone(n[0] - 12, t + n[1], n[2] + 0.25, "triangle", 0.12, out);
+  });
+  [62, 66, 69, 74, 78].forEach(function (m) { tone(m, t + 0.54, 2.2, "triangle", 0.07, out); });
+}
+
+function toggleMusic() {
+  wantMusic = !wantMusic;
+  try { window.localStorage.setItem(MUSIC_KEY, wantMusic ? "on" : "off"); } catch (e) {}
+  if (wantMusic) startMusic(); else stopMusic();
+  render();
+}
+
+// ---------- Confetti for the winner ----------
+var confetti = { raf: null, parts: [] };
+function startConfetti(colors) {
+  stopConfetti();
+  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  var cv = document.getElementById("confetti");
+  if (!cv || !cv.getContext) return;
+  var dpr = window.devicePixelRatio || 1;
+  cv.width = window.innerWidth * dpr;
+  cv.height = window.innerHeight * dpr;
+  cv.style.display = "block";
+  var c = cv.getContext("2d");
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  var W = window.innerWidth, H = window.innerHeight;
+  var palette = colors.concat(["#E2B857", "#F3EFE6"]);
+  confetti.parts = [];
+  for (var i = 0; i < 180; i++) {
+    confetti.parts.push({
+      x: Math.random() * W, y: -20 - Math.random() * H,
+      vx: (Math.random() - 0.5) * 1.6, vy: 1.5 + Math.random() * 2.5,
+      w: 6 + Math.random() * 6, h: 8 + Math.random() * 8,
+      r: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.2,
+      color: palette[Math.floor(Math.random() * palette.length)]
+    });
+  }
+  var start = performance.now();
+  function frame(now) {
+    var elapsed = (now - start) / 1000;
+    c.clearRect(0, 0, W, H);
+    var alive = 0;
+    confetti.parts.forEach(function (p) {
+      p.x += p.vx + Math.sin(now / 600 + p.r) * 0.4;
+      p.y += p.vy;
+      p.r += p.vr;
+      if (p.y > H + 20 && elapsed < 5) { p.y = -20; p.x = Math.random() * W; }
+      if (p.y <= H + 20) {
+        alive++;
+        c.save();
+        c.translate(p.x, p.y);
+        c.rotate(p.r);
+        c.fillStyle = p.color;
+        c.fillRect(-p.w / 2, -p.h / 2, p.w, p.h * Math.abs(Math.cos(p.r * 2)) + 1);
+        c.restore();
+      }
+    });
+    if (alive > 0) confetti.raf = requestAnimationFrame(frame); else stopConfetti();
+  }
+  confetti.raf = requestAnimationFrame(frame);
+}
+function stopConfetti() {
+  if (confetti.raf) cancelAnimationFrame(confetti.raf);
+  confetti.raf = null;
+  var cv = document.getElementById("confetti");
+  if (cv) { cv.style.display = "none"; var c = cv.getContext && cv.getContext("2d"); if (c) c.clearRect(0, 0, cv.width, cv.height); }
+}
+
+function winners() {
+  var act = teams.active;
+  var top = Math.max.apply(null, act.map(function (i) { return state.scores[i]; }));
+  return act.filter(function (i) { return state.scores[i] === top; });
+}
+
+function viewSplash() {
+  var w = winners();
+  var single = w.length === 1;
+  var color = HOUSES[w[0]].color;
+  var names = w.map(function (i) { return '<span style="color:' + HOUSES[i].color + '">' + HOUSES[i].name + '</span>'; });
+  var title = single ? names[0] : names.slice(0, -1).join(", ") + " &amp; " + names[names.length - 1];
+  var members = single ? membersOf(w[0]) : [];
+  var trophy = '<svg class="trophy" viewBox="0 0 120 120" aria-hidden="true" fill="none" stroke="#E2B857" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M34 18h52v22c0 18-12 32-26 32S34 58 34 40z" fill="rgba(226,184,87,.18)"></path>' +
+    '<path d="M34 26H20c0 16 8 24 18 26"></path><path d="M86 26h14c0 16-8 24-18 26"></path>' +
+    '<path d="M60 72v16"></path><path d="M44 102h32l-4-14H48z" fill="rgba(226,184,87,.18)"></path><path d="M38 104h44"></path></svg>';
+  return '<div class="splash" role="dialog" aria-modal="true" aria-labelledby="splash-title" style="--house:' + color + '">' +
+    '<div class="splash-inner">' + trophy +
+    '<span class="eyebrow accent">' + (single ? 'The House Cup goes to' : 'It’s a tie! The House Cup is shared by') + '</span>' +
+    '<h2 id="splash-title" class="splash-title' + (single ? '' : ' tie') + '">' + title + '</h2>' +
+    '<span class="splash-score">' + state.scores[w[0]] + ' points</span>' +
+    (members.length ? '<span class="muted">Congratulations, ' + members.map(esc).join(", ") + '!</span>' : '') +
+    '<button class="btn gold big center" data-action="closeSplash">See the final standings</button>' +
+    '</div></div>';
+}
+
+function musicButton() {
+  var icon = wantMusic
+    ? '<path d="M11 5L6 9H3v6h3l5 4V5z"></path><path d="M15.5 8.5a5 5 0 0 1 0 7"></path><path d="M18.5 5.5a9 9 0 0 1 0 13"></path>'
+    : '<path d="M11 5L6 9H3v6h3l5 4V5z"></path><path d="M22 9l-6 6"></path><path d="M16 9l6 6"></path>';
+  return '<button class="btn ghost music-btn" data-action="toggleMusic" aria-pressed="' + wantMusic + '">' +
+    '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + icon + '</svg>' +
+    'Music ' + (wantMusic ? 'on' : 'off') + '</button>';
 }
 
 // ---------- Actions ----------
@@ -505,8 +728,12 @@ var actions = {
       var w = parseInt(state.wagers[i], 10) || 0;
       return state.judged[i] ? sc + w : sc - w;
     });
-    setState({ before: state.scores.slice(), scores: next, finalStep: "results" });
-  }
+    setState({ before: state.scores.slice(), scores: next, finalStep: "results", splash: true });
+    startConfetti(winners().map(function (i) { return HOUSES[i].color; }));
+    playFanfare();
+  },
+  closeSplash: function () { stopConfetti(); setState({ splash: false }); },
+  toggleMusic: function () { toggleMusic(); }
 };
 
 // ---------- Views ----------
@@ -519,8 +746,8 @@ function viewHeader() {
       '<span class="score-name">' + h.name + '</span><span class="score-num">' + state.scores[i] + '</span></div>';
   }).join("") : "";
   var buttons = playing
-    ? '<div class="header-btns"><button class="btn ghost" data-action="players">Players</button><button class="btn ghost" data-action="reset">New game</button></div>'
-    : "";
+    ? '<div class="header-btns">' + musicButton() + '<button class="btn ghost" data-action="players">Players</button><button class="btn ghost" data-action="reset">New game</button></div>'
+    : '<div class="header-btns">' + musicButton() + '</div>';
   return '<header class="top"><h1><img class="emblem" src="assets/emblem.svg" alt="">Quizzards</h1><div class="scores">' + cards + buttons + '</div></header>';
 }
 
@@ -695,7 +922,10 @@ function render() {
     : state.screen === "board" ? viewBoard()
     : state.screen === "question" ? viewQuestion()
     : viewFinal();
-  document.getElementById("app").innerHTML = viewHeader() + main;
+  var showSplash = state.screen === "final" && state.finalStep === "results" && state.splash;
+  if (!showSplash && confetti.raf) stopConfetti();
+  document.getElementById("app").innerHTML = viewHeader() + main + (showSplash ? viewSplash() : "");
+  if (showSplash) { var sb = document.querySelector(".splash .btn"); if (sb) sb.focus(); }
   var key = state.screen + "/" + state.finalStep + "/" + state.setupStep;
   if (key !== lastView) window.scrollTo(0, 0);
   lastView = key;
@@ -704,6 +934,7 @@ function render() {
 // ---------- Wiring ----------
 document.addEventListener("click", function (e) {
   var el = e.target.closest("[data-action]");
+  if (wantMusic && !audio.on && !(el && el.dataset.action === "toggleMusic")) startMusic();
   if (el && actions[el.dataset.action]) actions[el.dataset.action](el);
 });
 document.addEventListener("input", function (e) {
@@ -712,6 +943,7 @@ document.addEventListener("input", function (e) {
 });
 document.addEventListener("keydown", function (e) {
   if (e.key === "Enter" && e.target.id === "name-input") { e.preventDefault(); addNameFromInput(); }
+  if (e.key === "Escape" && state.splash) actions.closeSplash();
 });
 
 state = fresh();
