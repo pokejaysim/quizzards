@@ -99,6 +99,7 @@ h1{display:flex;align-items:center;gap:14px;margin:0;font-family:Cinzel,Georgia,
 .hat-thinking{font-size:24px;font-style:italic;color:var(--muted);min-height:64px;display:flex;align-items:center;animation:pulse 1s ease-in-out infinite alternate}
 .hat-house{font-family:Cinzel,Georgia,serif;font-weight:700;font-size:56px;min-height:64px;letter-spacing:.04em;animation:pop .35s ease-out}
 .center-row{justify-content:center}
+.center-text{text-align:center}
 .rosters{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
 .roster{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
 .roster-name{padding:12px 18px 4px;font-family:Cinzel,Georgia,serif;font-weight:700;font-size:22px}
@@ -136,6 +137,16 @@ h1{display:flex;align-items:center;gap:14px;margin:0;font-family:Cinzel,Georgia,
 .wager-clear{margin:0 18px;align-self:flex-start}
 .phone-answer{font-size:17px;font-weight:600;color:var(--accent)}
 .p-form{display:flex;flex-direction:column;gap:10px;width:100%;align-items:stretch}
+.buzz-line{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:15px;font-weight:600}
+.buzz-item{display:inline-flex;align-items:center;gap:6px}
+.p-card.tight{padding:20px 10px}
+.p-board{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px;width:100%}
+.p-head{display:flex;align-items:center;justify-content:center;min-height:44px;padding:2px 0;background:#232A4A;border-radius:6px;font-size:9px;font-weight:700;letter-spacing:-.02em;line-height:1.15;text-align:center;color:var(--accent);overflow-wrap:break-word}
+.p-tile{min-height:44px;background:var(--bg);color:var(--text);border:1px solid var(--line2);border-radius:8px;font-size:18px;font-weight:700;touch-action:manipulation}
+.p-tile.used{background:#171B30;border:1px dashed var(--line)}
+.p-question{margin:0;font-size:22px;font-weight:600;line-height:1.3}
+.p-answer{display:flex;flex-direction:column;gap:4px;align-self:stretch;padding:14px 16px;background:var(--bg);border:1px solid var(--accent);border-radius:14px}
+.p-answer-text{font-size:22px;font-weight:700;color:var(--accent)}
 body.phone #app{max-width:520px;padding:20px 16px 40px;gap:16px}
 .p-top{display:flex;justify-content:space-between;align-items:center}
 .p-brand{font-family:Cinzel,Georgia,serif;font-weight:700;font-size:24px;color:var(--accent)}
@@ -147,7 +158,7 @@ body.phone #app{max-width:520px;padding:20px 16px 40px;gap:16px}
 .p-house{display:flex;flex-direction:column;gap:2px;align-items:center;padding:22px 16px;border-radius:20px;color:#14182B}
 .p-house-name{font-family:Cinzel,Georgia,serif;font-weight:700;font-size:34px}
 .p-house-sub{font-size:15px;font-weight:600}
-.buzzer{width:min(72vw,280px);height:min(72vw,280px);border-radius:50%;border:6px solid rgba(255,255,255,.35);color:#14182B;font-size:28px;font-weight:700;box-shadow:0 10px 0 rgba(0,0,0,.35);touch-action:manipulation}
+.buzzer{width:min(56vw,220px);height:min(56vw,220px);border-radius:50%;border:6px solid rgba(255,255,255,.35);color:#14182B;font-size:28px;font-weight:700;box-shadow:0 10px 0 rgba(0,0,0,.35);touch-action:manipulation}
 .buzzer:active{transform:translateY(6px);box-shadow:0 4px 0 rgba(0,0,0,.35)}
 @media (max-width:640px){h1{font-size:34px}.splash-title{font-size:44px}.splash-title.tie{font-size:34px}h1 .emblem{width:40px;height:40px}.card{padding:24px}.question{font-size:26px}.winner-text{font-size:30px}.hat-house{font-size:40px}.hat-name{font-size:30px}.rank{flex-wrap:wrap}}
 </style>
@@ -695,7 +706,7 @@ var ROOM = (function () {
   try { var r = new URLSearchParams(window.location.search).get("room"); return r ? r.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 6) : ""; } catch (e) { return ""; }
 })();
 var phoneMode = !!ROOM;
-var net = { on: false, code: "", channel: null, status: "off", ids: {}, buzz: null, beat: null, qr: "", fin: { wagerBy: [null, null, null, null], answers: [null, null, null, null] } };
+var net = { on: false, code: "", channel: null, status: "off", ids: {}, buzz: [], beat: null, qr: "", fin: { wagerBy: [null, null, null, null], answers: [null, null, null, null] } };
 function resetFin() { net.fin = { wagerBy: [null, null, null, null], answers: [null, null, null, null] }; }
 
 function loadScript(src) {
@@ -751,12 +762,20 @@ function hostSnapshot() {
     }
     return { id: id, name: name, house: house };
   });
+  var qPair = state.screen === "question" ? CATS[state.cat].qs[state.v - 1][state.deal[state.cat][state.v - 1]] : null;
+  var fq = FINALS[state.finalIdx];
   return {
+    used: Object.keys(state.used),
+    // Phones get the question when it opens. The answer is only sent after the reveal.
+    q: qPair ? { cat: CATS[state.cat].name, v: state.v, text: qPair[0], answer: state.revealed ? qPair[1] : null } : null,
     t: "state", phase: phase, players: players, scores: state.scores, active: teams.active,
     turn: turnHouse(), buzz: net.buzz, winners: phase === "results" ? winners() : null,
     // Only who submitted is shared, never the wager or answer itself.
     fin: state.screen === "final" ? {
       step: state.finalStep,
+      cat: fq.cat,
+      q: state.finalStep === "wager" ? null : fq.q,
+      a: state.finalStep === "judge" || state.finalStep === "results" ? fq.a : null,
       max: [0, 1, 2, 3].map(function (i) { return maxWager(i); }),
       wagerBy: net.fin.wagerBy,
       answerBy: net.fin.answers.map(function (a) { return a ? { id: a.id, name: a.name } : null; })
@@ -765,7 +784,9 @@ function hostSnapshot() {
 }
 
 function hostBroadcast() {
-  if (net.on && net.status === "on") netSend(net.channel, hostSnapshot());
+  if (!net.on) return;
+  try { window.sessionStorage.setItem("quizzards-room", JSON.stringify({ code: net.code, ids: net.ids })); } catch (e) {}
+  if (net.status === "on") netSend(net.channel, hostSnapshot());
 }
 
 function renderKeepingInput() {
@@ -829,12 +850,23 @@ function hostOnMsg(p) {
     }
     return;
   }
+  if (p.t === "pick" && typeof p.id === "string") {
+    var pw = net.ids[p.id];
+    var pk = pw ? houseOfName(pw) : null;
+    var pc = parseInt(p.cat, 10), pv = parseInt(p.v, 10);
+    if (!pk || state.screen !== "board" || pk.house !== turnHouse()) return;
+    if (!(pc >= 0 && pc < CATS.length && pv >= 1 && pv <= 10) || state.used[pc + "-" + pv]) return;
+    net.buzz = [];
+    setState({ screen: "question", cat: pc, v: pv, revealed: false });
+    return;
+  }
   if (p.t === "buzz" && typeof p.id === "string") {
     var who = net.ids[p.id];
     var h = who ? houseOfName(who) : null;
-    if (!h || net.buzz || state.screen !== "question" || state.revealed) return;
+    if (!h || state.screen !== "question" || state.revealed) return;
     if (h.house === turnHouse()) return;
-    net.buzz = { id: p.id, name: who, house: h.house };
+    if (net.buzz.some(function (b) { return b.house === h.house; })) return;
+    net.buzz.push({ id: p.id, name: who, house: h.house });
     if (wantMusic && audioInit()) { audio.ctx.resume(); tone(81, audio.ctx.currentTime + 0.01, 0.35, "square", 0.12, audio.ctx.destination); }
     render();
   }
@@ -858,11 +890,11 @@ function joinUrl() {
   return window.location.origin + window.location.pathname + "?room=" + net.code;
 }
 
-function enablePhones() {
+function enablePhones(savedCode) {
   if (net.on) return;
   var letters = "BCDFGHJKLMNPQRSTVWXZ";
-  var code = "";
-  for (var i = 0; i < 4; i++) code += letters[Math.floor(Math.random() * letters.length)];
+  var code = savedCode || "";
+  for (var i = 0; !savedCode && i < 4; i++) code += letters[Math.floor(Math.random() * letters.length)];
   net.on = true;
   net.code = code;
   net.status = "connecting";
@@ -895,15 +927,21 @@ function viewJoinPanel() {
     '<span class="muted small">' + status + (phones ? ' · ' + phones + (phones === 1 ? ' phone' : ' phones') + ' joined' : '') + '</span></div></div>';
 }
 
+var ORD = ["1st", "2nd", "3rd", "4th"];
 function viewBuzzBanner() {
-  if (!net.on || !Object.keys(net.ids).length) return "";
-  if (net.buzz) {
-    var h = HOUSES[net.buzz.house];
-    return '<div class="buzz-banner" style="border-color:' + h.color + '"><span class="pip big-pip" style="background:' + h.color + '"></span>' +
-      '<div class="turn-text"><span class="turn-name">' + h.name + ' buzzed to steal!</span><span class="muted small">' + esc(net.buzz.name) + ' was first</span></div>' +
-      (state.revealed ? '' : '<button class="btn ghost" data-action="clearBuzz">Clear buzz</button>') + '</div>';
+  if (!net.on || !Object.keys(net.ids).length || teams.active.length < 2) return "";
+  if (net.buzz.length) {
+    var first = HOUSES[net.buzz[0].house];
+    var line = net.buzz.map(function (b, k) {
+      return '<span class="buzz-item"><span class="pip" style="background:' + HOUSES[b.house].color + '"></span>' + ORD[k] + ': ' + HOUSES[b.house].name + ' (' + esc(b.name) + ')</span>';
+    }).join("");
+    return '<div class="buzz-banner" style="border-color:' + first.color + '">' +
+      '<div class="turn-text"><span class="turn-name">' + first.name + ' buzzed to steal!</span>' +
+      '<span class="buzz-line">' + line + '</span>' +
+      (state.revealed ? '' : '<span class="muted small">If ' + HOUSES[turnHouse()].name + ' misses, steals go in this order.</span>') + '</div>' +
+      (state.revealed ? '' : '<button class="btn ghost" data-action="clearBuzz">Clear buzzes</button>') + '</div>';
   }
-  return state.revealed ? "" : '<p class="muted small">Buzzers are open for the other houses.</p>';
+  return state.revealed ? "" : '<p class="muted small">Buzzers are open. Other houses can buzz to line up a steal.</p>';
 }
 
 // ----- Phone side -----
@@ -958,21 +996,40 @@ function phoneView() {
   if (st.phase === "sorting" || st.phase === "rosters" || st.phase === "lobby") {
     body = '<p class="p-big">Welcome to ' + h.name + '!</p><p class="muted">Find your housemates and get ready.</p>';
   } else if (st.phase === "board") {
-    body = myTurn ? '<p class="p-big">Your house picks next!</p><p class="muted">Choose a category and points, and tell the host.</p>'
-      : '<p class="p-big">' + HOUSES[st.turn].name + ' is picking…</p>';
-  } else if (st.phase === "question") {
-    if (st.buzz) {
-      body = st.buzz.id === ph.id ? '<p class="p-big">You buzzed first! Give your answer.</p>'
-        : st.buzz.house === me.house ? '<p class="p-big">' + esc(st.buzz.name) + ' buzzed for your house!</p>'
-        : '<p class="p-big">' + HOUSES[st.buzz.house].name + ' buzzed first.</p>';
+    var usedMap = {};
+    (st.used || []).forEach(function (k) { usedMap[k] = true; });
+    var left = CATS.length * 10 - (st.used || []).length;
+    if (!left) {
+      body = '<p class="p-big">Board cleared!</p><p class="muted">The final question is next.</p>';
     } else if (myTurn) {
-      body = '<p class="p-big">Your house answers first.</p><p class="muted">Talk it over and tell the host your answer.</p>';
+      var grid = CATS.map(function (c) { return '<div class="p-head">' + esc(c.name) + '</div>'; }).join("");
+      for (var v = 1; v <= 10; v++) for (var ci = 0; ci < CATS.length; ci++) {
+        grid += usedMap[ci + "-" + v] ? '<div class="p-tile used" aria-hidden="true"></div>'
+          : '<button class="p-tile" data-cat="' + ci + '" data-v="' + v + '" aria-label="' + esc(CATS[ci].name) + ' for ' + v + '">' + v + '</button>';
+      }
+      return head + badge + '<div class="p-card tight"><p class="p-big">Your house picks!</p>' +
+        '<p class="muted small">Tap a tile. 1 is easiest, 10 is hardest.</p><div class="p-board">' + grid + '</div></div>';
     } else {
-      body = '<button class="buzzer" id="p-buzz" style="background:' + h.color + '">' + (ph.buzzed ? 'Buzzed…' : 'Buzz to steal') + '</button>' +
-        '<p class="muted">Think ' + HOUSES[st.turn].name + ' will miss? Buzz in.</p>';
+      body = '<p class="p-big">' + HOUSES[st.turn].name + ' is picking…</p>';
     }
-  } else if (st.phase === "revealed") {
-    body = '<p class="p-big">The answer is on the big screen.</p>';
+  } else if (st.phase === "question" || st.phase === "revealed") {
+    var q = st.q || { cat: "", v: 0, text: "", answer: null };
+    var qBlock = '<span class="chip">' + esc(q.cat) + ' · ' + q.v + (q.v === 1 ? ' point' : ' points') + '</span>' +
+      '<p class="p-question">' + esc(q.text) + '</p>';
+    var line = st.buzz || [];
+    var place = -1;
+    line.forEach(function (b, k) { if (b.house === me.house) place = k; });
+    if (st.phase === "revealed") {
+      body = qBlock + '<div class="p-answer"><span class="eyebrow">Answer</span><span class="p-answer-text">' + esc(q.answer || "") + '</span></div>';
+    } else if (myTurn) {
+      body = qBlock + '<p class="p-big">Your house answers first.</p><p class="muted">Talk it over and say your answer out loud.</p>';
+    } else if (place >= 0) {
+      body = qBlock + '<p class="p-big">' + (line[place].id === ph.id ? 'You buzzed!' : esc(line[place].name) + ' buzzed for your house!') + '</p>' +
+        '<p class="muted">Your house is ' + ORD[place] + ' in line to steal if ' + HOUSES[st.turn].name + ' misses.</p>';
+    } else {
+      body = qBlock + '<button class="buzzer" id="p-buzz" style="background:' + h.color + '">' + (ph.buzzed ? 'Buzzed…' : 'Buzz to steal') + '</button>' +
+        '<p class="muted">Know it? Buzz in to steal if ' + HOUSES[st.turn].name + ' misses.</p>';
+    }
   } else if (st.phase === "final") {
     var f = st.fin || { step: "wager", max: [10, 10, 10, 10], wagerBy: [], answerBy: [] };
     if (f.step === "wager") {
@@ -980,21 +1037,23 @@ function phoneView() {
       var mineW = wb && wb.id === ph.id && ph.myWager !== null;
       var wStatus = !wb ? 'Agree on a wager with your house, and keep it secret.'
         : (mineW ? 'Your wager of ' + ph.myWager + ' is in.' : esc(wb.name) + ' set your house’s wager.') + ' You can change it until the host locks it.';
-      body = '<p class="p-big">Final question: place your wager</p><p class="muted">' + wStatus + '</p>' +
+      body = '<span class="chip">Category: ' + esc(f.cat || "") + '</span><p class="p-big">Final question: place your wager</p><p class="muted">' + wStatus + '</p>' +
         '<form id="p-wager" class="p-form" novalidate><label class="label" for="p-wager-in">Wager (0 to ' + f.max[me.house] + ')</label>' +
         '<input id="p-wager-in" type="number" inputmode="numeric" min="0" max="' + f.max[me.house] + '" value="' + (mineW ? ph.myWager : '') + '">' +
         '<button class="btn gold big p-wide" type="submit">' + (wb ? 'Change wager' : 'Lock in wager') + '</button></form>';
     } else if (f.step === "question") {
       var ab = f.answerBy[me.house];
       var mineA = ab && ab.id === ph.id && ph.myAnswer !== null;
-      var aStatus = !ab ? 'Read the question on the big screen, then type your house’s answer.'
+      var aStatus = !ab ? 'Type your house’s answer.'
         : (mineA ? 'Your answer is in: “' + esc(ph.myAnswer) + '”.' : esc(ab.name) + ' sent your house’s answer.') + ' You can change it until the host reveals.';
-      body = '<p class="p-big">Final question: your answer</p><p class="muted">' + aStatus + '</p>' +
+      body = '<span class="chip">Final question</span><p class="p-question">' + esc(f.q || "") + '</p><p class="muted">' + aStatus + '</p>' +
         '<form id="p-answer" class="p-form"><label class="label" for="p-answer-in">Answer</label>' +
         '<input id="p-answer-in" type="text" maxlength="80" autocomplete="off" value="' + (mineA ? esc(ph.myAnswer) : '') + '">' +
         '<button class="btn gold big p-wide" type="submit">' + (ab ? 'Change answer' : 'Send answer') + '</button></form>';
     } else {
-      body = '<p class="p-big">Answers are locked.</p><p class="muted">Watch the big screen.</p>';
+      body = '<span class="chip">Final question</span><p class="p-question">' + esc(f.q || "") + '</p>' +
+        '<div class="p-answer"><span class="eyebrow">Answer</span><span class="p-answer-text">' + esc(f.a || "") + '</span></div>' +
+        '<p class="muted">Answers are locked. The host is checking them.</p>';
     }
   } else {
     var won = st.winners && st.winners.indexOf(me.house) >= 0;
@@ -1023,11 +1082,10 @@ function startPhone() {
   renderPhone();
   openChannel(ROOM, function (p) {
     if (p.t !== "state" || !Array.isArray(p.players)) return;
-    var hadBuzz = !!(ph.st && ph.st.buzz);
     ph.st = p;
     ph.lastSeen = Date.now();
     if (phoneMe()) ph.wantJoin = false;
-    if (p.phase !== "question" || (hadBuzz && !p.buzz)) ph.buzzed = false;
+    if (p.phase !== "question") ph.buzzed = false;
     if (p.phase !== "final" && p.phase !== "results") { ph.myWager = null; ph.myAnswer = null; }
     renderPhone();
   }, function (st) {
@@ -1040,7 +1098,7 @@ function startPhone() {
   }).catch(function () { ph.status = "error"; renderPhone(); });
   setInterval(function () {
     if (ph.status === "on" && (!ph.st || Date.now() - ph.lastSeen > 8000)) netSend(ph.channel, { t: "hello", id: ph.id });
-    if (ph.buzzed && ph.st && !ph.st.buzz && Date.now() - ph.buzzAt > 2500) ph.buzzed = false;
+    if (ph.buzzed && Date.now() - ph.buzzAt > 2500) ph.buzzed = false;
     if (ph.wantJoin && ph.st && !phoneMe()) netSend(ph.channel, { t: "join", id: ph.id, name: ph.name });
     renderPhone();
   }, 3000);
@@ -1067,6 +1125,8 @@ function startPhone() {
   });
   document.addEventListener("click", function (e) {
     if (e.target.closest && e.target.closest("#p-buzz") && !ph.buzzed) phoneBuzz();
+    var tile = e.target.closest && e.target.closest("button.p-tile");
+    if (tile) netSend(ph.channel, { t: "pick", id: ph.id, cat: +tile.dataset.cat, v: +tile.dataset.v });
   });
 }
 
@@ -1079,11 +1139,13 @@ var actions = {
     savePlayers(teams.players);
     render();
   },
-  enablePhones: function () { enablePhones(); },
-  clearBuzz: function () { net.buzz = null; render(); },
+  enablePhones: function () { enablePhones(""); },
+  clearBuzz: function () { net.buzz = []; render(); },
   clearNames: function () { net.ids = {}; teams.players = []; savePlayers(teams.players); render(); },
   sortPlayers: function () {
     if (!teams.players.length) return;
+    stopConfetti(); net.buzz = []; resetFin();
+    if (state.screen !== "setup") { state = fresh(); state.screen = "setup"; }
     var names = shuffle(teams.players);
     var order = shuffle([0, 1, 2, 3]);
     teams.sorted = names.map(function (n, i) { return { name: n, house: order[i % 4] }; });
@@ -1108,10 +1170,10 @@ var actions = {
   },
   startGame: function () { state = fresh(); render(); },
   players: function () { setState({ screen: "setup", setupStep: "names" }); },
-  reset: function () { state = fresh(); render(); },
-  pick: function (el) { net.buzz = null; setState({ screen: "question", cat: +el.dataset.cat, v: +el.dataset.v, revealed: false }); },
+  reset: function () { stopConfetti(); net.buzz = []; resetFin(); state = fresh(); render(); },
+  pick: function (el) { net.buzz = []; setState({ screen: "question", cat: +el.dataset.cat, v: +el.dataset.v, revealed: false }); },
   reveal: function () { setState({ revealed: true }); },
-  back: function () { net.buzz = null; setState({ screen: "board", revealed: false }); },
+  back: function () { net.buzz = []; setState({ screen: "board", revealed: false }); },
   award: function (el) {
     var team = +el.dataset.team;
     var scores = state.scores.slice();
@@ -1119,7 +1181,7 @@ var actions = {
     var used = Object.assign({}, state.used);
     used[state.cat + "-" + state.v] = true;
     markSeen(state.cat + "-" + (state.v - 1) + "-" + state.deal[state.cat][state.v - 1]);
-    net.buzz = null;
+    net.buzz = [];
     setState({ scores: scores, used: used, screen: "board", revealed: false, turn: (state.turn + 1) % teams.active.length });
   },
   clearWager: function (el) { var i = +el.dataset.house; state.wagers[i] = ""; net.fin.wagerBy[i] = null; render(); },
@@ -1262,11 +1324,12 @@ function viewQuestion() {
     body = '<p class="muted lead"><strong class="turn-inline" style="color:' + HOUSES[th].color + '">' + HOUSES[th].name + '</strong> answers first.' + stealNote + '</p>' +
       '<button class="btn gold big" data-action="reveal">Reveal answer</button>';
   } else {
-    var order = [th].concat(teams.active.filter(function (h) { return h !== th; }));
+    var buzzed = net.buzz.map(function (b) { return b.house; });
+    var order = [th].concat(buzzed, teams.active.filter(function (h) { return h !== th && buzzed.indexOf(h) < 0; }));
     var houseBtns = order.map(function (i) {
       var h = HOUSES[i];
       var label = i === th ? h.name + ' +' + state.v : h.name + ' steals +' + state.v;
-      return '<button class="btn house' + (i === th || (net.buzz && net.buzz.house === i) ? ' picker' : '') + '" data-action="award" data-team="' + i + '"><span class="pip" style="background:' + h.color + '"></span>' +
+      return '<button class="btn house' + (i === th || buzzed.indexOf(i) >= 0 ? ' picker' : '') + '" data-action="award" data-team="' + i + '"><span class="pip" style="background:' + h.color + '"></span>' +
         label + '</button>';
     }).join("");
     body = '<div class="answer"><span class="eyebrow">Answer</span><span class="answer-text">' + esc(pair[1]) + '</span></div>' +
@@ -1338,7 +1401,9 @@ function viewFinal() {
       : names.length === act.length && act.length > 2 ? "Everyone ties!"
       : "It's a tie: " + names.slice(0, -1).join(", ") + " and " + names[names.length - 1] + "!";
     inner = '<div class="winner"><span class="eyebrow">The House Cup</span><span class="winner-text">' + esc(winner) + '</span></div>' +
-      '<div class="stack-sm">' + rank + '</div><button class="btn gold big center" data-action="reset">Play again</button>';
+      '<div class="stack-sm">' + rank + '</div><div class="row center-row"><button class="btn gold big" data-action="reset">Play again, same houses</button>' +
+      (teams.players.length ? '<button class="btn ghost" data-action="sortPlayers">Sort into new houses</button>' : '') + '</div>' +
+      (net.on ? '<p class="muted small center-text">Everyone on a phone stays in the game. Nobody needs to rejoin.</p>' : '');
   }
   return '<section class="narrow wide"><div class="card final"><div class="meta"><span class="final-title">Final Question</span>' +
     '<span class="chip">Category: ' + esc(fq.cat) + '</span></div>' + inner + '</div></section>';
@@ -1378,7 +1443,17 @@ document.addEventListener("keydown", function (e) {
 
 state = fresh();
 state.screen = "setup";
-if (phoneMode) startPhone(); else render();
+if (phoneMode) startPhone(); else {
+  render();
+  // If the host page was reloaded, reopen the same room so phones stay connected.
+  try {
+    var savedRoom = JSON.parse(window.sessionStorage.getItem("quizzards-room") || "null");
+    if (savedRoom && /^[A-Z]{4}$/.test(savedRoom.code)) {
+      Object.keys(savedRoom.ids || {}).forEach(function (id) { if (teams.players.indexOf(savedRoom.ids[id]) >= 0) net.ids[id] = savedRoom.ids[id]; });
+      enablePhones(savedRoom.code);
+    }
+  } catch (e) {}
+}
 </script>
 </body>
 </html>
