@@ -147,6 +147,36 @@ h1{display:flex;align-items:center;gap:14px;margin:0;font-family:Cinzel,Georgia,
 .p-question{margin:0;font-size:22px;font-weight:600;line-height:1.3}
 .p-answer{display:flex;flex-direction:column;gap:4px;align-self:stretch;padding:14px 16px;background:var(--bg);border:1px solid var(--accent);border-radius:14px}
 .p-answer-text{font-size:22px;font-weight:700;color:var(--accent)}
+.modal{position:fixed;inset:0;z-index:40;display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;background:rgba(10,12,24,.82);overflow-y:auto}
+.modal-card{width:100%;max-width:640px;display:flex;flex-direction:column;gap:24px;padding:28px;background:var(--card);border:1px solid var(--line2);border-radius:20px}
+.modal-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.modal-head h2{margin:0}
+.menu-sec{display:flex;flex-direction:column;gap:10px}
+.menu-h{margin:0;font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.btn[aria-pressed="true"]{border-color:var(--accent)}
+.seg-row{display:flex;flex-wrap:wrap;border:1px solid var(--line2);border-radius:12px;overflow:hidden;align-self:flex-start}
+.seg{min-height:44px;padding:0 16px;background:transparent;color:var(--text);border:none;border-right:1px solid var(--line2);font-size:15px;font-weight:600}
+.seg:last-child{border-right:none}
+.seg.on{background:var(--accent);color:var(--bg)}
+.seg:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
+.adj-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.adj-name{flex:1 1 110px;font-weight:700}
+.adj-score{min-width:44px;text-align:right;font-size:20px;font-weight:700;margin-right:6px}
+.btn.adj{min-width:52px;min-height:44px;padding:0 10px}
+.menu-btn{display:inline-flex;align-items:center;gap:8px}
+.timer{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.timer-track{flex:1 1 200px;height:10px;background:#2A3156;border-radius:5px;overflow:hidden}
+.timer-fill{display:block;height:100%;width:100%;background:var(--accent);transition:width .25s linear}
+.timer-num{min-width:96px;font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+.timer.low .timer-fill{background:#E58A6B}
+.timer.low .timer-num,.timer.up .timer-num{color:#F0A08A}
+.btn.small-btn{min-height:44px;padding:0 14px;font-size:14px;align-self:center}
+.net-pill{align-self:center;padding:8px 14px;border-radius:999px;background:#3A2530;color:#F3C6B8;font-size:14px;font-weight:600}
+.resume-scores{display:flex;flex-wrap:wrap;gap:10px}
+.p-conn{padding:10px 14px;border-radius:12px;background:#3A2530;color:#F3C6B8;font-size:15px;font-weight:600;text-align:center}
+.p-timer{align-self:stretch}
+.p-timer .timer-num{min-width:0;font-size:20px}
+@media (prefers-reduced-motion:reduce){.timer-fill{transition:none}}
 body.phone #app{max-width:520px;padding:20px 16px 40px;gap:16px}
 .p-top{display:flex;justify-content:space-between;align-items:center}
 .p-brand{font-family:Cinzel,Georgia,serif;font-weight:700;font-size:24px;color:var(--accent)}
@@ -165,213 +195,9 @@ body.phone #app{max-width:520px;padding:20px 16px 40px;gap:16px}
 </head>
 <body>
 <main id="app"></main>
+<script src="assets/questions.js"></script>
 <canvas id="confetti" aria-hidden="true"></canvas>
 <script>
-// Question library: each category has 10 levels (1 = easiest, 10 = hardest),
-// and each level holds a pool of [question, answer] pairs. One is drawn per game.
-var CATS = [
-  { name: "Spells", qs: [
-    [["What spell lights up the tip of your wand?", "Lumos"],
-     ["What spell puts out the light from a wand?", "Nox"],
-     ["What incantation casts the Patronus Charm?", "Expecto Patronum"]],
-    [["Which levitation charm does Hermione tell Ron he's mispronouncing?", "Wingardium Leviosa"],
-     ["What is the incantation for the Killing Curse?", "Avada Kedavra"],
-     ["What does the spell Reparo do?", "Repairs broken objects"]],
-    [["What spell unlocks doors?", "Alohomora"],
-     ["What phrase makes the Marauder's Map appear?", "\"I solemnly swear that I am up to no good\""],
-     ["What spell stuns an opponent?", "Stupefy"]],
-    [["What disarming spell became Harry's signature move?", "Expelliarmus"],
-     ["When Ron's broken wand backfires in second year, what does his curse make him do?", "Burp up slugs"],
-     ["The spell Riddikulus is used to defeat what creature?", "A Boggart"]],
-    [["What spell does Harry use to call his Firebolt to him during the first Triwizard task?", "Accio"],
-     ["Name all three Unforgivable Curses.", "Avada Kedavra, Crucio and Imperio"],
-     ["What spell backfires on Lockhart in the Chamber of Secrets and wipes his memory?", "Obliviate (a Memory Charm)"]],
-    [["What spell does Hermione use to freeze Neville stiff in first year?", "Petrificus Totalus (the Full Body-Bind)"],
-     ["What spell does Draco use at the Duelling Club to make Harry's legs dance?", "Tarantallegra"],
-     ["What Half-Blood Prince spell hangs a person upside down by the ankle?", "Levicorpus"]],
-    [["What form does Hermione's Patronus take?", "An otter"],
-     ["What form does Ron's Patronus take?", "A Jack Russell terrier"],
-     ["What form does Snape's Patronus take?", "A doe"]],
-    [["What spell conjures the Dark Mark into the sky?", "Morsmordre"],
-     ["What Half-Blood Prince spell glues a person's tongue to the roof of their mouth?", "Langlock"],
-     ["What does Hermione's jinx on the DA sign-up sheet do to whoever betrays the group?", "Spells out SNEAK in pimples across their face"]],
-    [["What slashing curse did the Half-Blood Prince invent?", "Sectumsempra"],
-     ["What charm does Hermione put on the fake Galleons the DA uses to send meeting times?", "The Protean Charm"],
-     ["What spell does Hermione use to try to reveal the Half-Blood Prince's secrets in his book?", "Specialis Revelio"]],
-    [["What spell does Amos Diggory use on Harry's wand at the World Cup to reveal the last spell it cast?", "Prior Incantato"],
-     ["What spell does Hermione use to send her conjured birds flying at Ron?", "Oppugno"],
-     ["What spell does Hermione try on Tom Riddle's diary to reveal invisible ink?", "Aparecium"]]
-  ]},
-  { name: "Hogwarts", qs: [
-    [["Which house is Harry sorted into?", "Gryffindor"],
-     ["Who is the headmaster of Hogwarts for most of the series?", "Albus Dumbledore"],
-     ["How many houses are there at Hogwarts?", "Four"]],
-    [["What platform does the Hogwarts Express leave from?", "Platform 9¾"],
-     ["Which house is Draco Malfoy in?", "Slytherin"],
-     ["What animal represents Hufflepuff?", "A badger"]],
-    [["What object decides which house new students join?", "The Sorting Hat"],
-     ["Which house is represented by an eagle?", "Ravenclaw"],
-     ["What is the woods next to Hogwarts called?", "The Forbidden Forest"]],
-    [["What village near Hogwarts can students visit starting in third year?", "Hogsmeade"],
-     ["What tree attacks Harry and Ron's flying car?", "The Whomping Willow"],
-     ["What is the name of the poltergeist who causes trouble at Hogwarts?", "Peeves"]],
-    [["What is the name of Gryffindor's house ghost?", "Nearly Headless Nick"],
-     ["Who is head of Gryffindor house?", "Professor Minerva McGonagall"],
-     ["What is the name of the joke shop in Hogsmeade?", "Zonko's"]],
-    [["Which seventh-floor room opens when you walk past it three times thinking of what you need?", "The Room of Requirement"],
-     ["Which ghost haunts the girls' bathroom on the second floor?", "Moaning Myrtle"],
-     ["What is the name of the sweet shop in Hogsmeade?", "Honeydukes"]],
-    [["What are the names of the Hogwarts caretaker and his cat?", "Argus Filch and Mrs Norris"],
-     ["What is the name of Slytherin's house ghost?", "The Bloody Baron"],
-     ["Who is head of Hufflepuff house?", "Professor Pomona Sprout"]],
-    [["Which part of the castle is the Hufflepuff common room entrance near?", "The kitchens"],
-     ["To get into the Hogwarts kitchens, what do you tickle?", "The pear in the painting of a bowl of fruit"],
-     ["Where is the Slytherin common room?", "In the dungeons, under the lake"]],
-    [["Instead of a password, what must you do to get into Ravenclaw Tower?", "Answer a riddle"],
-     ["What is the name of Ravenclaw's house ghost?", "The Grey Lady"],
-     ["Name all four founders of Hogwarts.", "Godric Gryffindor, Helga Hufflepuff, Rowena Ravenclaw and Salazar Slytherin"]],
-    [["What is the Hogwarts school motto?", "Draco dormiens nunquam titillandus (Never tickle a sleeping dragon)"],
-     ["What is the name of Hufflepuff's house ghost?", "The Fat Friar"],
-     ["Which statue hides the secret passage to the Honeydukes cellar?", "The one-eyed witch"]]
-  ]},
-  { name: "Characters", qs: [
-    [["Who are Harry's two best friends?", "Ron Weasley and Hermione Granger"],
-     ["Who is the half-giant gamekeeper at Hogwarts?", "Hagrid"],
-     ["What is the name of Harry's cousin?", "Dudley Dursley"]],
-    [["What is Lord Voldemort's real name?", "Tom Marvolo Riddle"],
-     ["What are the first names of Harry's aunt and uncle?", "Petunia and Vernon"],
-     ["Who is Harry's main rival from Slytherin?", "Draco Malfoy"]],
-    [["What house-elf does Harry free by tricking Lucius Malfoy into giving him a sock?", "Dobby"],
-     ["What is the name of Ron's younger sister?", "Ginny Weasley"],
-     ["Which Weasley twins open a joke shop?", "Fred and George"]],
-    [["Who is Harry's godfather?", "Sirius Black"],
-     ["What are the first names of Harry's parents?", "James and Lily"],
-     ["Which Gryffindor boy keeps losing his toad, Trevor?", "Neville Longbottom"]],
-    [["What is Hagrid's first name?", "Rubeus"],
-     ["Which Ravenclaw girl, nicknamed \"Loony,\" wears radish earrings?", "Luna Lovegood"],
-     ["What is Professor McGonagall's first name?", "Minerva"]],
-    [["Which werewolf teaches Defence Against the Dark Arts in Harry's third year?", "Remus Lupin"],
-     ["Who betrayed Harry's parents to Voldemort?", "Peter Pettigrew"],
-     ["Who does Harry take to the Yule Ball?", "Parvati Patil"]],
-    [["Who turns out to be the Half-Blood Prince?", "Severus Snape"],
-     ["Who is Harry's first crush, the Ravenclaw Seeker?", "Cho Chang"],
-     ["Which Death Eater is Sirius Black's cousin?", "Bellatrix Lestrange"]],
-    [["Who spends Harry's fourth year disguised as Mad-Eye Moody?", "Barty Crouch Jr."],
-     ["What is the name of the Black family's house-elf?", "Kreacher"],
-     ["What is Hermione's middle name?", "Jean"]],
-    [["What is the name of Dumbledore's brother, and which pub does he run?", "Aberforth Dumbledore, the Hog's Head"],
-     ["What is the name of Hagrid's giant half-brother?", "Grawp"],
-     ["What is Luna's father's name, and what magazine does he run?", "Xenophilius Lovegood, The Quibbler"]],
-    [["What are Dumbledore's three middle names?", "Percival Wulfric Brian"],
-     ["What was Snape's mother's maiden name?", "Prince (Eileen Prince)"],
-     ["What was the name of Voldemort's mother?", "Merope Gaunt"]]
-  ]},
-  { name: "Magical Creatures", qs: [
-    [["What kind of bird is Hedwig?", "A snowy owl"],
-     ["What kind of creature is Dobby?", "A house-elf"],
-     ["What kind of animal is Hagrid's pet Fang?", "A dog (a boarhound)"]],
-    [["What kind of animal is Ron's pet Scabbers?", "A rat"],
-     ["What is the name of Neville's toad?", "Trevor"],
-     ["What creatures guard the wizard prison Azkaban?", "Dementors"]],
-    [["What makes Fluffy the three-headed dog fall asleep?", "Music"],
-     ["What creatures run Gringotts bank?", "Goblins"],
-     ["What animal is Harry's Patronus?", "A stag"]],
-    [["What kind of creature is Buckbeak?", "A hippogriff"],
-     ["What huge creature with tentacles lives in the Black Lake?", "The giant squid"],
-     ["What blue creatures does Lockhart release in his first lesson?", "Cornish pixies"]],
-    [["What kind of bird is Fawkes?", "A phoenix"],
-     ["What giant serpent lives in the Chamber of Secrets?", "A basilisk"],
-     ["What creatures live in the Black Lake and guard the hostages in the second task?", "Merpeople"]],
-    [["What does Hagrid name the baby dragon he hatches in first year?", "Norbert"],
-     ["What is the name of Ron's tiny owl?", "Pigwidgeon"],
-     ["What creature's blood keeps Voldemort alive in the Forbidden Forest?", "A unicorn's"]],
-    [["What is the name of the giant spider Hagrid raised?", "Aragog"],
-     ["What creatures does Hagrid breed in fourth year that sting and explode?", "Blast-Ended Skrewts"],
-     ["What kind of creature is Firenze?", "A centaur"]],
-    [["Which breed of dragon does Harry face in the first Triwizard task?", "A Hungarian Horntail"],
-     ["What water demons grab at Harry during the second task?", "Grindylows"],
-     ["What creature asks Harry a riddle in the Triwizard maze?", "A sphinx"]],
-    [["What creatures pull the Hogwarts carriages, visible only to those who have seen death?", "Thestrals"],
-     ["What new name does Hagrid give Buckbeak to hide him?", "Witherwings"],
-     ["What creature is drawn to shiny things and digs for treasure?", "A Niffler"]],
-    [["Crookshanks is part cat and part what magical creature?", "Kneazle"],
-     ["What imaginary creature is Luna's father always searching for?", "The Crumple-Horned Snorkack"],
-     ["What breed of dragon is Norbert?", "A Norwegian Ridgeback"]]
-  ]},
-  { name: "Quidditch", qs: [
-    [["What position does Harry play?", "Seeker"],
-     ["What do Quidditch players fly on?", "Broomsticks"],
-     ["What colour is the Snitch?", "Gold"]],
-    [["How many points is catching the Golden Snitch worth?", "150"],
-     ["How many points is a goal worth?", "10"],
-     ["What do Beaters carry to hit Bludgers?", "Bats"]],
-    [["What is the ball Chasers throw through the hoops called?", "The Quaffle"],
-     ["What position does Ron play?", "Keeper"],
-     ["How many goal hoops are at each end of the pitch?", "Three"]],
-    [["What are the balls that try to knock players off their brooms called?", "Bludgers"],
-     ["Who commentates the Hogwarts matches, a friend of Fred and George?", "Lee Jordan"],
-     ["What position do Fred and George play?", "Beaters"]],
-    [["How many players are on a Quidditch team?", "Seven"],
-     ["Who teaches flying lessons at Hogwarts?", "Madam Hooch"],
-     ["Who is Slytherin's Seeker in Harry's year?", "Draco Malfoy"]],
-    [["What was Harry's first broomstick?", "The Nimbus 2000"],
-     ["What position does Cedric Diggory play for Hufflepuff?", "Seeker (he's also captain)"],
-     ["What brooms does Lucius Malfoy buy for the whole Slytherin team?", "Nimbus 2001s"]],
-    [["Who sent Harry the Firebolt?", "Sirius Black"],
-     ["Who becomes Gryffindor's Quidditch captain in Harry's sixth year?", "Harry"],
-     ["What destroys Harry's Nimbus 2000?", "The Whomping Willow"]],
-    [["Who was Gryffindor's Quidditch captain in Harry's first three years?", "Oliver Wood"],
-     ["Which professional team does Oliver Wood sign with?", "Puddlemere United"],
-     ["Which Quidditch book does Snape confiscate from Harry in first year?", "Quidditch Through the Ages"]],
-    [["Which country won the 1994 Quidditch World Cup?", "Ireland"],
-     ["Who was Ireland's Seeker in the 1994 World Cup final?", "Aidan Lynch"],
-     ["What were Bulgaria's mascots at the World Cup?", "Veela"]],
-    [["What is the name of the fake-out dive Viktor Krum uses to trick the other Seeker?", "The Wronski Feint"],
-     ["What was the final score of the 1994 World Cup final?", "Ireland 170, Bulgaria 160"],
-     ["Which orange-robed professional team does Ron support?", "The Chudley Cannons"]]
-  ]},
-  { name: "Potions", qs: [
-    [["Who teaches Potions for Harry's first five years?", "Severus Snape"],
-     ["What pot do students brew their potions in?", "A cauldron"],
-     ["Which of Harry's friends is best at Potions homework?", "Hermione"]],
-    [["Which potion lets you take on someone else's appearance?", "Polyjuice Potion"],
-     ["Which house is Snape head of?", "Slytherin"],
-     ["Whose old textbook does Harry use in sixth-year Potions?", "The Half-Blood Prince's"]],
-    [["What do you have to add to Polyjuice Potion from the person you're becoming?", "A piece of them, like a hair"],
-     ["What goes wrong when Hermione drinks Polyjuice in second year?", "She used a cat hair, so she turns part cat"],
-     ["What potion does Madam Pomfrey use to regrow the bones in Harry's arm?", "Skele-Gro"]],
-    [["Which potion is nicknamed \"liquid luck\"?", "Felix Felicis"],
-     ["Whose bathroom do Harry, Ron and Hermione brew Polyjuice in?", "Moaning Myrtle's"],
-     ["What does Pepperup Potion do?", "Cures colds, and makes steam come out of your ears"]],
-    [["What truth serum makes the drinker reveal their secrets?", "Veritaserum"],
-     ["Who gives Ron chocolates spiked with love potion in sixth year?", "Romilda Vane"],
-     ["What potion is used to revive the students who were Petrified?", "Mandrake Restorative Draught"]],
-    [["Who teaches Potions in Harry's sixth year?", "Horace Slughorn"],
-     ["What is the name of Slughorn's club for favourite students?", "The Slug Club"],
-     ["Who brews the Polyjuice Potion in second year?", "Hermione"]],
-    [["What stone, taken from a goat's stomach, saves you from most poisons?", "A bezoar"],
-     ["What poisons Ron in Slughorn's office?", "Poisoned oak-matured mead"],
-     ["What does Harry drink to help him get Slughorn's real memory?", "Felix Felicis"]],
-    [["What is the most powerful love potion, the one that smells different to each person?", "Amortentia"],
-     ["Which ingredients does Hermione steal from Snape's stores for the Polyjuice?", "Boomslang skin and bicorn horn"],
-     ["What does the Draught of Peace do?", "Calms anxiety"]],
-    [["What potion does Snape brew for Lupin every month?", "Wolfsbane Potion"],
-     ["What happens if you take too much Felix Felicis?", "Giddiness, recklessness and dangerous overconfidence"],
-     ["What is the potion-ingredient shop in Diagon Alley called?", "Slug & Jiggers Apothecary"]],
-    [["In Harry's first Potions class, Snape asks what you get from asphodel and wormwood. What's the answer?", "The Draught of Living Death"],
-     ["When Slughorn shows the class Amortentia, what does Hermione say she smells?", "Freshly mown grass and new parchment (then she stops herself)"],
-     ["Name any three ingredients in Polyjuice Potion.", "Any three of: lacewing flies, leeches, fluxweed, knotgrass, bicorn horn, boomslang skin"]]
-  ]}
-];
-
-var FINALS = [
-  { cat: "The Deathly Hallows", q: "In the tale of the three brothers, the Deathly Hallows first belonged to the Peverell brothers. What were the three brothers' first names?", a: "Antioch, Cadmus and Ignotus Peverell" },
-  { cat: "Horcruxes", q: "Name all six Horcruxes that Voldemort made on purpose.", a: "Tom Riddle's diary, Marvolo Gaunt's ring, Slytherin's locket, Hufflepuff's cup, Ravenclaw's diadem and Nagini" },
-  { cat: "Wandlore", q: "What wood and what core is Voldemort's original wand made of?", a: "Yew, with a phoenix feather core" },
-  { cat: "Godric's Hollow", q: "What words are carved on James and Lily Potter's gravestone?", a: "\"The last enemy that shall be destroyed is death\"" },
-  { cat: "The Mirror of Erised", q: "When Harry asks what Dumbledore sees in the Mirror of Erised, what does Dumbledore say he sees?", a: "Himself holding a pair of thick, woollen socks" }
-];
-
 var HOUSES = [
   { name: "Gryffindor", color: "#D6453D" },
   { name: "Hufflepuff", color: "#ECB939" },
@@ -458,6 +284,109 @@ function markSeen(key) {
   var seen = loadSeen();
   seen[key] = true;
   saveSeen(seen);
+}
+
+// ----- Answer timer -----
+var tickState = { lastSecs: null, upPlayed: false };
+function timerStart() {
+  tickState = { lastSecs: null, upPlayed: false };
+  if (!timerSecs) { state.timerEnd = null; state.timerLeft = null; state.timerTotal = 0; return; }
+  state.timerTotal = timerSecs * 1000;
+  state.timerEnd = Date.now() + state.timerTotal;
+  state.timerLeft = null;
+}
+function timerStop() { state.timerEnd = null; state.timerLeft = null; }
+function timerRemaining() {
+  if (state.timerLeft !== null && state.timerLeft !== undefined) return state.timerLeft;
+  if (!state.timerEnd) return null;
+  return Math.max(0, state.timerEnd - Date.now());
+}
+function timerActive() {
+  return (state.screen === "question" && !state.revealed) || (state.screen === "final" && state.finalStep === "question");
+}
+function paintTimer(el, rem, total, paused) {
+  if (!el) return;
+  var secs = Math.ceil(rem / 1000);
+  var num = el.querySelector(".timer-num"), fill = el.querySelector(".timer-fill");
+  var txt = rem <= 0 ? "Time’s up!" : (paused ? "Paused " : "") + Math.floor(secs / 60) + ":" + ("0" + (secs % 60)).slice(-2);
+  if (num && num.textContent !== txt) num.textContent = txt;
+  if (fill) fill.style.width = (total ? Math.max(0, Math.min(100, rem / total * 100)) : 0) + "%";
+  el.classList.toggle("low", rem > 0 && secs <= 5);
+  el.classList.toggle("up", rem <= 0);
+}
+var TIMER_HTML = '<div class="timer-track" aria-hidden="true"><span class="timer-fill"></span></div><span class="timer-num" role="timer"></span>';
+
+function openQuestion(cat, v) {
+  net.buzz = [];
+  state.cat = cat; state.v = v; state.revealed = false; state.screen = "question";
+  timerStart();
+  sfx("open");
+  render();
+}
+
+// ----- Undo -----
+var undoStack = [];
+function pushUndo(label) {
+  undoStack.push({ label: label, state: JSON.stringify(state), fin: JSON.stringify(net.fin) });
+  if (undoStack.length > 30) undoStack.shift();
+}
+
+// ----- Save and resume -----
+var SAVE_KEY = "quizzards-save-v1";
+var pendingSave = null;
+function saveGame() {
+  if (state.screen === "setup" && state.setupStep === "resume") return;
+  try {
+    var copy = JSON.parse(JSON.stringify(state));
+    copy.splash = false; copy.thinking = false;
+    window.localStorage.setItem(SAVE_KEY, JSON.stringify({
+      v: 1, at: Date.now(), state: copy,
+      teams: { players: teams.players, sorted: teams.sorted, active: teams.active },
+      room: net.on ? { code: net.code, ids: net.ids } : null
+    }));
+  } catch (e) {}
+}
+function loadSave() {
+  try {
+    var sv = JSON.parse(window.localStorage.getItem(SAVE_KEY) || "null");
+    if (!sv || sv.v !== 1 || !sv.state || !sv.teams) return null;
+    if (Date.now() - sv.at > 24 * 3600 * 1000) return null;
+    if (!Array.isArray(sv.state.deal) || sv.state.deal.length !== CATS.length || !FINALS[sv.state.finalIdx]) return null;
+    return sv;
+  } catch (e) { return null; }
+}
+function restoreSave(sv) {
+  teams.players = Array.isArray(sv.teams.players) ? sv.teams.players : [];
+  teams.sorted = sv.teams.sorted || null;
+  teams.active = Array.isArray(sv.teams.active) && sv.teams.active.length ? sv.teams.active : [0, 1, 2, 3];
+  state = Object.assign(fresh(), sv.state);
+  state.splash = false; state.thinking = false;
+  // A running timer comes back paused, so nobody loses time to the reload.
+  if (state.timerEnd) { state.timerLeft = Math.max(0, state.timerEnd - Date.now()); state.timerEnd = null; }
+  if (sv.room && /^[A-Z]{4}$/.test(sv.room.code)) {
+    Object.keys(sv.room.ids || {}).forEach(function (id) { if (teams.players.indexOf(sv.room.ids[id]) >= 0) net.ids[id] = sv.room.ids[id]; });
+    enablePhones(sv.room.code);
+  }
+}
+
+// ----- Host menu -----
+var menuOpen = false;
+var confirmNew = false;
+
+// ----- Keep the screen awake during a game -----
+var wake = { lock: null, pending: false };
+function keepAwake(on) {
+  if (!navigator.wakeLock) return;
+  if (on && !wake.lock && !wake.pending && document.visibilityState === "visible") {
+    wake.pending = true;
+    navigator.wakeLock.request("screen").then(function (l) {
+      wake.lock = l; wake.pending = false;
+      l.addEventListener("release", function () { wake.lock = null; });
+    }).catch(function () { wake.pending = false; });
+  } else if (!on && wake.lock) {
+    try { wake.lock.release(); } catch (e) {}
+    wake.lock = null;
+  }
 }
 
 function maxWager(i) { return Math.max(state.scores[i], 10); }
@@ -580,7 +509,7 @@ function stopMusic() {
 
 // A short triumphant flourish for the winner. Plays when sound is on.
 function playFanfare() {
-  if (!wantMusic || !audioInit()) return;
+  if (!wantSfx || !audioInit()) return;
   var ctx = audio.ctx;
   ctx.resume();
   var out = ctx.createGain();
@@ -596,6 +525,27 @@ function playFanfare() {
     tone(n[0] - 12, t + n[1], n[2] + 0.25, "triangle", 0.12, out);
   });
   [62, 66, 69, 74, 78].forEach(function (m) { tone(m, t + 0.54, 2.2, "triangle", 0.07, out); });
+}
+
+var SFX_KEY = "quizzards-sfx-v1";
+var TIMER_KEY = "quizzards-timer-v1";
+function loadPref(k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } }
+function savePref(k, v) { try { window.localStorage.setItem(k, v); } catch (e) {} }
+var wantSfx = loadPref(SFX_KEY) !== "off";
+var timerSecs = (function () { var n = parseInt(loadPref(TIMER_KEY), 10); return [0, 30, 45, 60].indexOf(n) >= 0 ? n : 30; })();
+
+// Short sound effects, made in the browser like the music.
+function sfx(kind) {
+  if (!wantSfx || !audioInit()) return;
+  var ctx = audio.ctx;
+  try { ctx.resume(); } catch (e) {}
+  var t = ctx.currentTime + 0.01, d = ctx.destination;
+  if (kind === "buzz") { tone(57, t, 0.35, "square", 0.1, d); tone(69, t, 0.35, "square", 0.06, d); }
+  else if (kind === "right") { tone(76, t, 0.2, "triangle", 0.2, d); tone(81, t + 0.12, 0.2, "triangle", 0.2, d); tone(88, t + 0.24, 0.6, "triangle", 0.18, d); }
+  else if (kind === "wrong") { tone(52, t, 0.3, "sawtooth", 0.07, d); tone(47, t + 0.22, 0.5, "sawtooth", 0.07, d); }
+  else if (kind === "tick") { tone(96, t, 0.06, "square", 0.05, d); }
+  else if (kind === "timeup") { tone(64, t, 0.22, "square", 0.08, d); tone(64, t + 0.28, 0.22, "square", 0.08, d); tone(60, t + 0.56, 0.6, "square", 0.08, d); }
+  else if (kind === "open") { tone(79, t, 0.14, "triangle", 0.12, d); tone(86, t + 0.09, 0.3, "triangle", 0.1, d); }
 }
 
 function toggleMusic() {
@@ -688,15 +638,6 @@ function viewSplash() {
     '</div></div>';
 }
 
-function musicButton() {
-  var icon = wantMusic
-    ? '<path d="M11 5L6 9H3v6h3l5 4V5z"></path><path d="M15.5 8.5a5 5 0 0 1 0 7"></path><path d="M18.5 5.5a9 9 0 0 1 0 13"></path>'
-    : '<path d="M11 5L6 9H3v6h3l5 4V5z"></path><path d="M22 9l-6 6"></path><path d="M16 9l6 6"></path>';
-  return '<button class="btn ghost music-btn" data-action="toggleMusic" aria-pressed="' + wantMusic + '">' +
-    '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + icon + '</svg>' +
-    'Music ' + (wantMusic ? 'on' : 'off') + '</button>';
-}
-
 // ---------- Phone join (optional, needs internet) ----------
 // The host screen runs the game. Phones only send "join" and "buzz", and
 // receive a small status update. Questions and answers never go to phones.
@@ -706,7 +647,7 @@ var ROOM = (function () {
   try { var r = new URLSearchParams(window.location.search).get("room"); return r ? r.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 6) : ""; } catch (e) { return ""; }
 })();
 var phoneMode = !!ROOM;
-var net = { on: false, code: "", channel: null, status: "off", ids: {}, buzz: [], beat: null, qr: "", fin: { wagerBy: [null, null, null, null], answers: [null, null, null, null] } };
+var net = { on: false, code: "", channel: null, status: "off", ids: {}, buzz: [], beat: null, qr: "", gen: 0, fails: 0, retryTimer: null, slowTimer: null, fin: { wagerBy: [null, null, null, null], answers: [null, null, null, null] } };
 function resetFin() { net.fin = { wagerBy: [null, null, null, null], answers: [null, null, null, null] }; }
 
 function loadScript(src) {
@@ -719,15 +660,21 @@ function loadScript(src) {
   });
 }
 
+var supa = null;
 function openChannel(code, onMsg, onStatus) {
   var need = window.supabase ? Promise.resolve() : loadScript("assets/supabase.js");
   return need.then(function () {
-    var client = window.supabase.createClient(SUPA_URL, SUPA_KEY, { auth: { persistSession: false } });
-    var ch = client.channel("quizzards-" + code, { config: { broadcast: { self: false } } });
+    if (!supa) supa = window.supabase.createClient(SUPA_URL, SUPA_KEY, { auth: { persistSession: false } });
+    var ch = supa.channel("quizzards-" + code, { config: { broadcast: { self: false } } });
     ch.on("broadcast", { event: "msg" }, function (m) { if (m && m.payload) onMsg(m.payload); });
     ch.subscribe(function (status) { onStatus(status === "SUBSCRIBED" ? "on" : status === "CLOSED" ? "off" : status === "CHANNEL_ERROR" || status === "TIMED_OUT" ? "error" : "connecting"); });
     return ch;
   });
+}
+
+function closeChannel(ch) {
+  if (!ch || !supa) return;
+  try { supa.removeChannel(ch); } catch (e) {}
 }
 
 function netSend(ch, payload) {
@@ -779,13 +726,13 @@ function hostSnapshot() {
       max: [0, 1, 2, 3].map(function (i) { return maxWager(i); }),
       wagerBy: net.fin.wagerBy,
       answerBy: net.fin.answers.map(function (a) { return a ? { id: a.id, name: a.name } : null; })
-    } : null
+    } : null,
+    timer: timerActive() && timerRemaining() !== null ? { left: timerRemaining(), total: state.timerTotal, paused: state.timerLeft !== null && state.timerLeft !== undefined } : null
   };
 }
 
 function hostBroadcast() {
   if (!net.on) return;
-  try { window.sessionStorage.setItem("quizzards-room", JSON.stringify({ code: net.code, ids: net.ids })); } catch (e) {}
   if (net.status === "on") netSend(net.channel, hostSnapshot());
 }
 
@@ -856,8 +803,7 @@ function hostOnMsg(p) {
     var pc = parseInt(p.cat, 10), pv = parseInt(p.v, 10);
     if (!pk || state.screen !== "board" || pk.house !== turnHouse()) return;
     if (!(pc >= 0 && pc < CATS.length && pv >= 1 && pv <= 10) || state.used[pc + "-" + pv]) return;
-    net.buzz = [];
-    setState({ screen: "question", cat: pc, v: pv, revealed: false });
+    openQuestion(pc, pv);
     return;
   }
   if (p.t === "buzz" && typeof p.id === "string") {
@@ -867,7 +813,7 @@ function hostOnMsg(p) {
     if (h.house === turnHouse()) return;
     if (net.buzz.some(function (b) { return b.house === h.house; })) return;
     net.buzz.push({ id: p.id, name: who, house: h.house });
-    if (wantMusic && audioInit()) { audio.ctx.resume(); tone(81, audio.ctx.currentTime + 0.01, 0.35, "square", 0.12, audio.ctx.destination); }
+    sfx("buzz");
     render();
   }
 }
@@ -890,6 +836,35 @@ function joinUrl() {
   return window.location.origin + window.location.pathname + "?room=" + net.code;
 }
 
+function hostConnect() {
+  var gen = ++net.gen;
+  if (net.channel) { closeChannel(net.channel); net.channel = null; }
+  net.status = "connecting";
+  clearTimeout(net.slowTimer);
+  net.slowTimer = setTimeout(function () {
+    if (gen === net.gen && net.status !== "on") { net.status = "error"; net.fails++; renderKeepingInput(); hostRetry(); }
+  }, 12000);
+  openChannel(net.code, hostOnMsg, function (st) {
+    if (gen !== net.gen) return;
+    var was = net.status;
+    net.status = st;
+    if (st === "on") { net.fails = 0; clearTimeout(net.slowTimer); hostBroadcast(); }
+    if (st === "error" || st === "off") { net.fails++; hostRetry(); }
+    if (st !== was) renderKeepingInput();
+  }).then(function (ch) {
+    if (gen !== net.gen) { closeChannel(ch); return; }
+    net.channel = ch;
+  }).catch(function () {
+    if (gen !== net.gen) return;
+    net.status = "error"; net.fails++; renderKeepingInput(); hostRetry();
+  });
+}
+
+function hostRetry() {
+  clearTimeout(net.retryTimer);
+  net.retryTimer = setTimeout(function () { if (net.on && net.status !== "on") hostConnect(); }, 4000);
+}
+
 function enablePhones(savedCode) {
   if (net.on) return;
   var letters = "BCDFGHJKLMNPQRSTVWXZ";
@@ -897,26 +872,20 @@ function enablePhones(savedCode) {
   for (var i = 0; !savedCode && i < 4; i++) code += letters[Math.floor(Math.random() * letters.length)];
   net.on = true;
   net.code = code;
-  net.status = "connecting";
   render();
   makeQr(joinUrl()).then(function (svg) { net.qr = svg; renderKeepingInput(); }).catch(function () {});
-  openChannel(code, hostOnMsg, function (st) {
-    var was = net.status;
-    net.status = st;
-    if (st === "on") hostBroadcast();
-    if (st !== was) renderKeepingInput();
-  }).then(function (ch) {
-    net.channel = ch;
-    net.beat = setInterval(hostBroadcast, 4000);
-  }).catch(function () { net.status = "error"; renderKeepingInput(); });
+  hostConnect();
+  if (!net.beat) net.beat = setInterval(hostBroadcast, 4000);
 }
+
+var PAUSED_HELP = "Can’t reach the phone service. Check the internet. If nobody has played for about a week, the free Supabase project may be paused: open supabase.com/dashboard, choose the quizzards project and press Restore.";
 
 function viewJoinPanel() {
   if (!net.on) {
     return '<div class="join-off"><button class="btn" data-action="enablePhones">Let players join by phone</button>' +
       '<span class="muted small">Shows a QR code. Phones become buzzers. Needs internet.</span></div>';
   }
-  var status = net.status === "on" ? "Ready for players" : net.status === "error" ? "Couldn’t connect. Check the internet and reload." : "Connecting…";
+  var status = net.status === "on" ? "Ready for players" : net.status === "error" ? (net.fails >= 2 ? PAUSED_HELP : "Connection lost. Trying again…") : "Connecting…";
   var phones = Object.keys(net.ids).length;
   return '<div class="join-panel">' +
     '<div class="qr" role="img" aria-label="QR code to join the game">' + (net.qr || "") + '</div>' +
@@ -945,7 +914,20 @@ function viewBuzzBanner() {
 }
 
 // ----- Phone side -----
-var ph = { id: "", name: "", channel: null, status: "connecting", st: null, lastSeen: 0, wantJoin: false, html: "", buzzed: false, myWager: null, myAnswer: null };
+var ph = { id: "", name: "", channel: null, status: "connecting", st: null, lastSeen: 0, wantJoin: false, html: "", buzzed: false, myWager: null, myAnswer: null, gen: 0, fails: 0, retry: null, timer: null, lastKick: 0 };
+
+function phoneTimerRemaining() {
+  var t = ph.timer;
+  if (!t) return null;
+  return t.paused ? t.left : Math.max(0, t.left - (Date.now() - t.at));
+}
+function paintPhoneTimer() {
+  var r = phoneTimerRemaining();
+  if (r !== null) paintTimer(document.getElementById("p-timer"), r, ph.timer.total, ph.timer.paused);
+}
+function phoneTimerBlock() {
+  return ph.st && ph.st.timer ? '<div class="timer p-timer" id="p-timer">' + TIMER_HTML + '</div>' : '';
+}
 
 function phoneMe() {
   if (!ph.st) return null;
@@ -967,6 +949,7 @@ function phoneBuzz() {
   ph.buzzed = true;
   ph.buzzAt = Date.now();
   netSend(ph.channel, { t: "buzz", id: ph.id });
+  sfx("buzz");
   try { if (navigator.vibrate) navigator.vibrate(60); } catch (e) {}
   renderPhone();
 }
@@ -974,9 +957,11 @@ function phoneBuzz() {
 function phoneView() {
   var head = '<header class="p-top"><span class="p-brand">Quizzards</span><span class="chip">Room ' + ROOM + '</span></header>';
   var st = ph.st;
-  var stale = st && Date.now() - ph.lastSeen > 13000;
-  if (ph.status === "error") return head + '<div class="p-card"><p class="p-big">Couldn’t connect</p><p class="muted">Check your internet, then reload this page.</p></div>';
-  if (!st || stale) return head + '<div class="p-card"><p class="p-big">Looking for the game…</p><p class="muted">Make sure the room code matches the big screen.</p></div>';
+  if (!st) {
+    if (ph.status === "error" && ph.fails >= 2) return head + '<div class="p-card"><p class="p-big">Couldn’t connect</p><p class="muted">Check your internet. The page keeps trying on its own. If it still fails, ask the host to check the game.</p></div>';
+    return head + '<div class="p-card"><p class="p-big">Looking for the game…</p><p class="muted">Make sure the room code matches the big screen.</p></div>';
+  }
+  if (ph.status !== "on" || Date.now() - ph.lastSeen > 9000) head += '<div class="p-conn" role="status">Reconnecting to the game…</div>';
   var me = phoneMe();
   if (!me) {
     if (ph.wantJoin) return head + '<div class="p-card"><p class="p-big">Joining…</p></div>';
@@ -1019,6 +1004,7 @@ function phoneView() {
     var line = st.buzz || [];
     var place = -1;
     line.forEach(function (b, k) { if (b.house === me.house) place = k; });
+    if (st.phase === "question") qBlock += phoneTimerBlock();
     if (st.phase === "revealed") {
       body = qBlock + '<div class="p-answer"><span class="eyebrow">Answer</span><span class="p-answer-text">' + esc(q.answer || "") + '</span></div>';
     } else if (myTurn) {
@@ -1046,7 +1032,7 @@ function phoneView() {
       var mineA = ab && ab.id === ph.id && ph.myAnswer !== null;
       var aStatus = !ab ? 'Type your house’s answer.'
         : (mineA ? 'Your answer is in: “' + esc(ph.myAnswer) + '”.' : esc(ab.name) + ' sent your house’s answer.') + ' You can change it until the host reveals.';
-      body = '<span class="chip">Final question</span><p class="p-question">' + esc(f.q || "") + '</p><p class="muted">' + aStatus + '</p>' +
+      body = '<span class="chip">Final question</span><p class="p-question">' + esc(f.q || "") + '</p>' + phoneTimerBlock() + '<p class="muted">' + aStatus + '</p>' +
         '<form id="p-answer" class="p-form"><label class="label" for="p-answer-in">Answer</label>' +
         '<input id="p-answer-in" type="text" maxlength="80" autocomplete="off" value="' + (mineA ? esc(ph.myAnswer) : '') + '">' +
         '<button class="btn gold big p-wide" type="submit">' + (ab ? 'Change answer' : 'Send answer') + '</button></form>';
@@ -1063,10 +1049,55 @@ function phoneView() {
 }
 
 function renderPhone() {
+  keepAwake(!!phoneMe());
   var html = phoneView();
-  if (html === ph.html) return;
-  ph.html = html;
-  document.getElementById("app").innerHTML = html;
+  if (html !== ph.html) {
+    ph.html = html;
+    // Keep whatever someone is typing when the screen redraws.
+    var act = document.activeElement;
+    var id = act && act.tagName === "INPUT" ? act.id : "";
+    var val = id ? act.value : null;
+    document.getElementById("app").innerHTML = html;
+    if (id) { var el = document.getElementById(id); if (el) { el.value = val; el.focus(); } }
+  }
+  paintPhoneTimer();
+}
+
+function phoneOnMsg(p) {
+  if (p.t !== "state" || !Array.isArray(p.players)) return;
+  ph.st = p;
+  ph.lastSeen = Date.now();
+  ph.timer = p.timer ? { left: p.timer.left, total: p.timer.total, paused: p.timer.paused, at: Date.now() } : null;
+  if (phoneMe()) { ph.wantJoin = false; ph.wasIn = true; }
+  if (p.phase !== "question") ph.buzzed = false;
+  if (p.phase !== "final" && p.phase !== "results") { ph.myWager = null; ph.myAnswer = null; }
+  renderPhone();
+}
+
+function phoneConnect() {
+  var gen = ++ph.gen;
+  if (ph.channel) { closeChannel(ph.channel); ph.channel = null; }
+  ph.status = "connecting";
+  ph.lastKick = Date.now();
+  openChannel(ROOM, phoneOnMsg, function (st) {
+    if (gen !== ph.gen) return;
+    ph.status = st;
+    if (st === "on") { ph.fails = 0; netSend(ph.channel, { t: "hello", id: ph.id }); }
+    if (st === "error" || st === "off") { ph.fails++; phoneRetry(); }
+    renderPhone();
+  }).then(function (ch) {
+    if (gen !== ph.gen) { closeChannel(ch); return; }
+    ph.channel = ch;
+    if (ph.status === "on") netSend(ch, { t: "hello", id: ph.id });
+  }).catch(function () {
+    if (gen !== ph.gen) return;
+    ph.status = "error"; ph.fails++; renderPhone(); phoneRetry();
+  });
+}
+
+function phoneRetry() {
+  clearTimeout(ph.retry);
+  ph.retry = setTimeout(function () { if (ph.status !== "on") phoneConnect(); }, 3000);
 }
 
 function startPhone() {
@@ -1080,24 +1111,17 @@ function startPhone() {
     try { window.localStorage.setItem("quizzards-phone-id", ph.id); } catch (e) {}
   }
   renderPhone();
-  openChannel(ROOM, function (p) {
-    if (p.t !== "state" || !Array.isArray(p.players)) return;
-    ph.st = p;
-    ph.lastSeen = Date.now();
-    if (phoneMe()) { ph.wantJoin = false; ph.wasIn = true; }
-    if (p.phase !== "question") ph.buzzed = false;
-    if (p.phase !== "final" && p.phase !== "results") { ph.myWager = null; ph.myAnswer = null; }
+  phoneConnect();
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState !== "visible") return;
+    // Phones often drop the connection while the screen is locked.
+    if (ph.status !== "on" || Date.now() - ph.lastSeen > 9000) phoneConnect();
+    else netSend(ph.channel, { t: "hello", id: ph.id });
     renderPhone();
-  }, function (st) {
-    ph.status = st;
-    if (st === "on") netSend(ph.channel, { t: "hello", id: ph.id });
-    renderPhone();
-  }).then(function (ch) {
-    ph.channel = ch;
-    if (ph.status === "on") netSend(ch, { t: "hello", id: ph.id });
-  }).catch(function () { ph.status = "error"; renderPhone(); });
+  });
   setInterval(function () {
     if (ph.status === "on" && (!ph.st || Date.now() - ph.lastSeen > 8000)) netSend(ph.channel, { t: "hello", id: ph.id });
+    if (ph.st && Date.now() - ph.lastSeen > 15000 && Date.now() - ph.lastKick > 15000) phoneConnect();
     if (ph.buzzed && Date.now() - ph.buzzAt > 2500) ph.buzzed = false;
     if (ph.wantJoin && ph.st && !phoneMe()) netSend(ph.channel, { t: "join", id: ph.id, name: ph.name });
     renderPhone();
@@ -1144,6 +1168,7 @@ var actions = {
   clearNames: function () { net.ids = {}; teams.players = []; savePlayers(teams.players); render(); },
   sortPlayers: function () {
     if (!teams.players.length) return;
+    undoStack = [];
     stopConfetti(); net.buzz = []; resetFin();
     if (state.screen !== "setup") { state = fresh(); state.screen = "setup"; }
     var names = shuffle(teams.players);
@@ -1163,26 +1188,31 @@ var actions = {
   },
   skipReveal: function () { clearTimeout(hatTimer); setState({ setupStep: "rosters", thinking: false }); },
   skipSorting: function () {
+    undoStack = [];
     teams.sorted = null;
     teams.active = [0, 1, 2, 3];
     state = fresh();
     render();
   },
-  startGame: function () { state = fresh(); render(); },
+  startGame: function () { undoStack = []; state = fresh(); render(); },
   players: function () { setState({ screen: "setup", setupStep: "names" }); },
   newGame: function () {
+    undoStack = []; confirmNew = false;
     stopConfetti(); net.buzz = []; resetFin();
     net.ids = {}; teams.players = []; savePlayers(teams.players);
     teams.sorted = null; teams.active = [0, 1, 2, 3];
     state = fresh(); state.screen = "setup";
     render();
   },
-  reset: function () { stopConfetti(); net.buzz = []; resetFin(); state = fresh(); render(); },
-  pick: function (el) { net.buzz = []; setState({ screen: "question", cat: +el.dataset.cat, v: +el.dataset.v, revealed: false }); },
-  reveal: function () { setState({ revealed: true }); },
-  back: function () { net.buzz = []; setState({ screen: "board", revealed: false }); },
+  reset: function () { undoStack = []; stopConfetti(); net.buzz = []; resetFin(); state = fresh(); render(); },
+  pick: function (el) { openQuestion(+el.dataset.cat, +el.dataset.v); },
+  reveal: function () { timerStop(); setState({ revealed: true }); },
+  back: function () { net.buzz = []; timerStop(); setState({ screen: "board", revealed: false }); },
   award: function (el) {
     var team = +el.dataset.team;
+    pushUndo(team >= 0 ? HOUSES[team].name + " +" + state.v : "No one, " + CATS[state.cat].name + " " + state.v);
+    sfx(team >= 0 ? "right" : "wrong");
+    timerStop();
     var scores = state.scores.slice();
     if (team >= 0) scores[team] += state.v;
     var used = Object.assign({}, state.used);
@@ -1199,15 +1229,19 @@ var actions = {
       if (isNaN(n)) n = 0;
       return String(Math.min(Math.max(n, 0), maxWager(i)));
     });
-    setState({ wagers: w, finalStep: "question" });
+    state.wagers = w;
+    state.finalStep = "question";
+    timerStart();
+    render();
   },
-  revealFinal: function () { markSeen("F-" + state.finalIdx); setState({ finalStep: "judge" }); },
+  revealFinal: function () { markSeen("F-" + state.finalIdx); timerStop(); setState({ finalStep: "judge" }); },
   judge: function (el) {
     var a = state.judged.slice();
     a[+el.dataset.house] = el.dataset.right === "1";
     setState({ judged: a });
   },
   finishFinal: function () {
+    pushUndo("final question scores");
     var next = state.scores.map(function (sc, i) {
       if (teams.active.indexOf(i) < 0) return sc;
       var w = parseInt(state.wagers[i], 10) || 0;
@@ -1218,8 +1252,49 @@ var actions = {
     playFanfare();
   },
   closeSplash: function () { stopConfetti(); setState({ splash: false }); },
-  toggleMusic: function () { toggleMusic(); }
+  toggleMusic: function () { toggleMusic(); },
+  toggleSfx: function () { wantSfx = !wantSfx; savePref(SFX_KEY, wantSfx ? "on" : "off"); if (wantSfx) sfx("right"); render(); },
+  setTimer: function (el) { timerSecs = +el.dataset.val; savePref(TIMER_KEY, String(timerSecs)); render(); },
+  openMenu: function () { menuOpen = true; confirmNew = false; render(); var b = document.querySelector(".modal .btn"); if (b) b.focus(); },
+  closeMenu: function () { menuOpen = false; confirmNew = false; render(); },
+  askNewGame: function () { confirmNew = true; render(); },
+  cancelNewGame: function () { confirmNew = false; render(); },
+  adjust: function (el) {
+    var i = +el.dataset.house, d = +el.dataset.d;
+    pushUndo(HOUSES[i].name + (d > 0 ? " +" : " ") + d + " (score fix)");
+    state.scores = state.scores.slice();
+    state.scores[i] += d;
+    render();
+  },
+  undo: function () {
+    var last = undoStack.pop();
+    if (!last) return;
+    state = JSON.parse(last.state);
+    net.fin = JSON.parse(last.fin);
+    state.splash = false;
+    stopConfetti();
+    render();
+  },
+  timerPause: function () {
+    var rem = timerRemaining();
+    if (rem === null) return;
+    if (state.timerLeft !== null && state.timerLeft !== undefined) { state.timerEnd = Date.now() + state.timerLeft; state.timerLeft = null; }
+    else { state.timerLeft = rem; state.timerEnd = null; }
+    render();
+  },
+  timerAdd: function () {
+    var rem = timerRemaining();
+    if (rem === null) return;
+    if (state.timerLeft !== null && state.timerLeft !== undefined) state.timerLeft += 15000;
+    else state.timerEnd = Date.now() + rem + 15000;
+    state.timerTotal = Math.max(state.timerTotal || 0, rem + 15000);
+    tickState.upPlayed = false;
+    render();
+  },
+  resume: function () { var sv = pendingSave; pendingSave = null; undoStack = []; restoreSave(sv); render(); },
+  discardSave: function () { pendingSave = null; state.setupStep = "names"; render(); }
 };
+var MENU_KEEP = ["openMenu", "toggleMusic", "toggleSfx", "setTimer", "adjust", "askNewGame", "cancelNewGame", "timerPause", "timerAdd"];
 
 // ---------- Views ----------
 function viewHeader() {
@@ -1230,14 +1305,76 @@ function viewHeader() {
     return '<div class="score' + (isTurn ? ' is-turn' : '') + '"><span class="bar" style="background:' + h.color + '"></span>' +
       '<span class="score-name">' + h.name + '</span><span class="score-num">' + state.scores[i] + '</span></div>';
   }).join("") : "";
-  var buttons = playing
-    ? '<div class="header-btns">' + musicButton() + '<button class="btn ghost" data-action="players">Players</button><button class="btn ghost" data-action="reset">New game</button></div>'
-    : '<div class="header-btns">' + musicButton() + '</div>';
+  var netPill = net.on && net.status !== "on" ? '<span class="net-pill" role="status">Phones reconnecting…</span>' : '';
+  var undoBtn = playing && undoStack.length ? '<button class="btn ghost" data-action="undo" title="Undo: ' + esc(undoStack[undoStack.length - 1].label) + '">Undo</button>' : '';
+  var buttons = '<div class="header-btns">' + netPill + undoBtn +
+    '<button class="btn ghost menu-btn" data-action="openMenu" aria-haspopup="dialog">' +
+    '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>Menu</button></div>';
   return '<header class="top"><h1><img class="emblem" src="assets/emblem.svg" alt="">Quizzards</h1><div class="scores">' + cards + buttons + '</div></header>';
 }
 
+function viewMenu() {
+  var playing = state.screen !== "setup";
+  var scores = "";
+  if (playing) {
+    scores = '<div class="menu-sec"><h3 class="menu-h">Fix scores</h3><div class="stack-sm">' + teams.active.map(function (i) {
+      return '<div class="adj-row"><span class="pip" style="background:' + HOUSES[i].color + '"></span><span class="adj-name">' + HOUSES[i].name + '</span>' +
+        '<span class="adj-score">' + state.scores[i] + '</span>' +
+        [-5, -1, 1, 5].map(function (d) {
+          return '<button class="btn adj" data-action="adjust" data-house="' + i + '" data-d="' + d + '" aria-label="' + (d > 0 ? 'Add ' : 'Take away ') + Math.abs(d) + ' for ' + HOUSES[i].name + '">' + (d > 0 ? '+' : '−') + Math.abs(d) + '</button>';
+        }).join("") + '</div>';
+    }).join("") + '</div>' +
+    (undoStack.length ? '<button class="btn left" data-action="undo">Undo: ' + esc(undoStack[undoStack.length - 1].label) + '</button>' : '<span class="muted small">Nothing to undo yet.</span>') + '</div>';
+  }
+  var timerBtns = [0, 30, 45, 60].map(function (t) {
+    var on = timerSecs === t;
+    return '<button class="seg' + (on ? ' on' : '') + '" data-action="setTimer" data-val="' + t + '" aria-pressed="' + on + '">' + (t ? t + ' sec' : 'Off') + '</button>';
+  }).join("");
+  var game = confirmNew
+    ? '<p class="muted">This clears every player and house' + (net.on ? ', and sends phones back to the join screen' : '') + '.</p><div class="row"><button class="btn gold" data-action="newGame">Yes, start over</button><button class="btn ghost" data-action="cancelNewGame">Cancel</button></div>'
+    : '<div class="row">' + (playing ? '<button class="btn" data-action="players">Players and houses</button><button class="btn" data-action="reset">Restart, same houses</button>' : '') +
+      '<button class="btn" data-action="askNewGame">Start over with new players</button></div>';
+  return '<div class="modal" role="dialog" aria-modal="true" aria-labelledby="menu-title"><div class="modal-card">' +
+    '<div class="modal-head"><h2 id="menu-title" class="final-title">Host menu</h2><button class="btn ghost" data-action="closeMenu">Close</button></div>' +
+    '<div class="menu-sec"><h3 class="menu-h">Sound</h3><div class="row">' +
+      '<button class="btn" data-action="toggleMusic" aria-pressed="' + wantMusic + '">Music: ' + (wantMusic ? 'on' : 'off') + '</button>' +
+      '<button class="btn" data-action="toggleSfx" aria-pressed="' + wantSfx + '">Sound effects: ' + (wantSfx ? 'on' : 'off') + '</button></div></div>' +
+    '<div class="menu-sec"><h3 class="menu-h">Answer timer</h3><div class="seg-row" role="group" aria-label="Answer timer length">' + timerBtns + '</div>' +
+      '<span class="muted small">Starts when a question opens. A change applies from the next question.</span></div>' +
+    scores +
+    '<div class="menu-sec"><h3 class="menu-h">Game</h3>' + game + '</div>' +
+    '</div></div>';
+}
+
+function viewTimer() {
+  if (!timerActive() || timerRemaining() === null) return "";
+  var paused = state.timerLeft !== null && state.timerLeft !== undefined;
+  return '<div class="timer" id="h-timer">' + TIMER_HTML +
+    '<button class="btn ghost small-btn" data-action="timerPause">' + (paused ? 'Resume' : 'Pause') + '</button>' +
+    '<button class="btn ghost small-btn" data-action="timerAdd">+15 sec</button></div>';
+}
+
+function viewResume() {
+  var sv = pendingSave;
+  var mins = Math.max(1, Math.round((Date.now() - sv.at) / 60000));
+  var ago = mins < 60 ? mins + (mins === 1 ? ' minute' : ' minutes') + ' ago' : Math.round(mins / 60) + (Math.round(mins / 60) === 1 ? ' hour' : ' hours') + ' ago';
+  var act = Array.isArray(sv.teams.active) && sv.teams.active.length ? sv.teams.active : [0, 1, 2, 3];
+  var cards = act.map(function (i) {
+    return '<div class="score"><span class="bar" style="background:' + HOUSES[i].color + '"></span><span class="score-name">' + HOUSES[i].name + '</span><span class="score-num">' + (sv.state.scores[i] || 0) + '</span></div>';
+  }).join("");
+  var played = Object.keys(sv.state.used || {}).length;
+  return '<section class="narrow"><div class="card">' +
+    '<div class="stack-sm"><span class="final-title">Pick up where you left off?</span>' +
+    '<p class="muted lead">A game was saved ' + ago + ', with ' + played + ' of ' + (CATS.length * 10) + ' tiles played.' +
+    (sv.room ? ' Phones will reconnect on their own.' : '') + '</p></div>' +
+    '<div class="resume-scores">' + cards + '</div>' +
+    '<div class="row"><button class="btn gold big" data-action="resume">Resume the game</button>' +
+    '<button class="btn ghost" data-action="discardSave">Start a new game</button></div></div></section>';
+}
+
 function viewSetup() {
-  if (state.setupStep === "names") {
+  if (state.setupStep === "resume" && pendingSave) return viewResume();
+  if (state.setupStep === "names" || state.setupStep === "resume") {
     var chips = teams.players.map(function (n, i) {
       return '<span class="name-chip">' + esc(n) + '<button class="chip-x" data-action="removeName" data-i="' + i + '" aria-label="Remove ' + esc(n) + '">' +
         '<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></span>';
@@ -1347,7 +1484,7 @@ function viewQuestion() {
     '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>Back to the board</button>' +
     '<div class="card"><div class="meta"><span class="chip">' + esc(c.name) + '</span><div class="meta-right"><span class="muted small">Difficulty</span>' +
     '<span class="dots">' + dots + '</span><span class="pts">' + state.v + (state.v === 1 ? ' point' : ' points') + '</span></div></div>' +
-    '<p class="question">' + esc(pair[0]) + '</p>' + viewBuzzBanner() + body + '</div></section>';
+    '<p class="question">' + esc(pair[0]) + '</p>' + viewTimer() + viewBuzzBanner() + body + '</div></section>';
 }
 
 function viewFinal() {
@@ -1372,7 +1509,7 @@ function viewFinal() {
       '<div class="wagers">' + cards + '</div><button class="btn gold big" data-action="lockWagers">Lock wagers and show the question</button>';
   } else if (state.finalStep === "question") {
     var answered = act.filter(function (i) { return net.fin.answers[i]; }).map(function (i) { return HOUSES[i].name; });
-    inner = '<p class="question">' + esc(fq.q) + '</p><p class="muted">Each house has 30 seconds to write down its answer' + (phonesOn ? ', or type it on a phone' : '') + '.</p>' +
+    inner = '<p class="question">' + esc(fq.q) + '</p>' + viewTimer() + '<p class="muted">Each house writes down its answer' + (phonesOn ? ', or types it on a phone' : '') + (timerRemaining() !== null ? ', before time runs out' : '') + '.</p>' +
       (phonesOn ? '<p class="muted small">Answers in from phones: ' + (answered.length ? answered.join(", ") : 'none yet') + '</p>' : '') +
       '<button class="btn gold big" data-action="revealFinal">Reveal answer</button>';
   } else if (state.finalStep === "judge") {
@@ -1424,8 +1561,11 @@ function render() {
     : viewFinal();
   var showSplash = state.screen === "final" && state.finalStep === "results" && state.splash;
   if (!showSplash && confetti.raf) stopConfetti();
-  document.getElementById("app").innerHTML = viewHeader() + main + (showSplash ? viewSplash() : "");
-  if (showSplash) { var sb = document.querySelector(".splash .btn"); if (sb) sb.focus(); }
+  document.getElementById("app").innerHTML = viewHeader() + main + (showSplash ? viewSplash() : "") + (menuOpen ? viewMenu() : "");
+  if (showSplash && !menuOpen) { var sb = document.querySelector(".splash .btn"); if (sb) sb.focus(); }
+  if (timerActive() && timerRemaining() !== null) paintTimer(document.getElementById("h-timer"), timerRemaining(), state.timerTotal, state.timerLeft !== null && state.timerLeft !== undefined);
+  saveGame();
+  keepAwake(state.screen !== "setup" || net.on);
   var key = state.screen + "/" + state.finalStep + "/" + state.setupStep;
   if (key !== lastView) window.scrollTo(0, 0);
   lastView = key;
@@ -1437,7 +1577,9 @@ document.addEventListener("click", function (e) {
   if (phoneMode) return;
   var el = e.target.closest("[data-action]");
   if (wantMusic && !audio.on && !(el && el.dataset.action === "toggleMusic")) startMusic();
-  if (el && actions[el.dataset.action]) actions[el.dataset.action](el);
+  if (!el || !actions[el.dataset.action]) return;
+  if (menuOpen && MENU_KEEP.indexOf(el.dataset.action) < 0) { menuOpen = false; confirmNew = false; }
+  actions[el.dataset.action](el);
 });
 document.addEventListener("input", function (e) {
   var i = e.target.dataset && e.target.dataset.wager;
@@ -1445,21 +1587,44 @@ document.addEventListener("input", function (e) {
 });
 document.addEventListener("keydown", function (e) {
   if (e.key === "Enter" && e.target.id === "name-input") { e.preventDefault(); addNameFromInput(); }
+  if (e.key === "Escape" && menuOpen) { actions.closeMenu(); var mb = document.querySelector(".menu-btn"); if (mb) mb.focus(); return; }
   if (e.key === "Escape" && state.splash) actions.closeSplash();
+});
+
+// Host timer: redraw the countdown and play the ticks.
+setInterval(function () {
+  if (phoneMode) { paintPhoneTimer(); return; }
+  if (!state || !timerActive()) return;
+  var rem = timerRemaining();
+  if (rem === null) return;
+  var paused = state.timerLeft !== null && state.timerLeft !== undefined;
+  paintTimer(document.getElementById("h-timer"), rem, state.timerTotal, paused);
+  var secs = Math.ceil(rem / 1000);
+  if (!paused && secs !== tickState.lastSecs) {
+    if (secs <= 5 && secs > 0) sfx("tick");
+    if (rem <= 0 && !tickState.upPlayed) { tickState.upPlayed = true; sfx("timeup"); hostBroadcast(); }
+  }
+  tickState.lastSecs = secs;
+}, 250);
+
+document.addEventListener("visibilitychange", function () {
+  if (phoneMode || document.visibilityState !== "visible") return;
+  if (net.on && net.status !== "on") hostConnect();
+  keepAwake(state.screen !== "setup" || net.on);
 });
 
 state = fresh();
 state.screen = "setup";
 if (phoneMode) startPhone(); else {
+  var saved = loadSave();
+  if (saved && saved.state.screen !== "setup") {
+    // A game was in progress: ask before picking it back up.
+    pendingSave = saved;
+    state.setupStep = "resume";
+  } else if (saved) {
+    restoreSave(saved);
+  }
   render();
-  // If the host page was reloaded, reopen the same room so phones stay connected.
-  try {
-    var savedRoom = JSON.parse(window.sessionStorage.getItem("quizzards-room") || "null");
-    if (savedRoom && /^[A-Z]{4}$/.test(savedRoom.code)) {
-      Object.keys(savedRoom.ids || {}).forEach(function (id) { if (teams.players.indexOf(savedRoom.ids[id]) >= 0) net.ids[id] = savedRoom.ids[id]; });
-      enablePhones(savedRoom.code);
-    }
-  } catch (e) {}
 }
 </script>
 </body>

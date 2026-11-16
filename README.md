@@ -11,9 +11,19 @@ A wizard-themed trivia board game for game night, played by four houses.
 
 ## Question library
 
-There are 180 board questions (3 for every tile) plus 5 final questions. Each new game shuffles which question appears on each tile. The browser remembers which questions you've already played, so they won't repeat until a tile's pool runs out.
+There are 300 board questions (5 for every tile) plus 8 final questions. Each new game shuffles which question appears on each tile. The browser remembers which questions you've already played, so they won't repeat until a tile's pool runs out.
 
-All the questions live in `index.html`, in the `CATS` and `FINALS` lists near the top of the script.
+All the questions live in `assets/questions.js`, in the `CATS` and `FINALS` lists. Where the books and films disagree, answers follow the books.
+
+## Tests
+
+The tests play through the game in a real browser, including a host screen with phones joining. They run on GitHub after every push, or locally with:
+
+```
+npm install
+npx playwright install chromium
+npm test
+```
 
 ## Running it
 
