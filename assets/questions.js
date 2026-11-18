@@ -1,4 +1,4 @@
-// Quizzards question library.
+// The Gilded Quill question library.
 // Each category has 10 levels (1 = easiest, 10 = hardest).
 // Each level holds a pool of [question, answer] pairs, and one is drawn per game.
 // Answers follow the books where the books and films differ.

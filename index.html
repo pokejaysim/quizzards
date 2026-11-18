@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Quizzards</title>
+<title>The Gilded Quill</title>
 <link rel="icon" type="image/svg+xml" href="assets/emblem.svg">
-<meta name="description" content="A wizard-themed trivia board game for four houses.">
+<meta name="description" content="The Gilded Quill: a hand-painted, wizard-themed trivia board game for four houses.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya:wght@500;700;800&family=Alegreya+Sans:wght@400;500;700;800&display=swap">
@@ -338,6 +338,8 @@ input:focus{border-color:var(--accent)!important;outline:none}
 .answer-text,.p-answer-text{font-family:Alegreya,Georgia,serif;font-weight:800}
 .painted-trophy{width:110px!important;height:auto!important;filter:drop-shadow(0 6px 14px rgba(0,0,0,.45))}
 @media (prefers-reduced-motion:reduce){.btn{transition:none}}
+.brand{white-space:nowrap}
+.t-the{font-size:.62em;font-weight:700;margin-right:.08em;vertical-align:.12em}
 </style>
 </head>
 <body>
@@ -1287,7 +1289,7 @@ function phoneBuzz() {
 }
 
 function phoneView() {
-  var head = '<header class="p-top"><span class="p-brand">Quizzards</span><span class="chip">Room ' + ROOM + '</span></header>';
+  var head = '<header class="p-top"><span class="p-brand"><span class="t-the">The</span> Gilded Quill</span><span class="chip">Room ' + ROOM + '</span></header>';
   var st = ph.st;
   if (!st) {
     if (ph.status === "error" && ph.fails >= 2) return head + '<div class="p-card"><p class="p-big">Couldn’t connect</p><p class="muted">Check your internet. The page keeps trying on its own. If it still fails, ask the host to check the game.</p></div>';
@@ -1400,7 +1402,7 @@ function hostCmd(act, extra) {
 }
 
 function hostPhoneView() {
-  var head = '<header class="p-top"><span class="p-brand">Quizzards</span><span class="chip host-chip">Host · Room ' + ROOM + '</span></header>';
+  var head = '<header class="p-top"><span class="p-brand"><span class="t-the">The</span> Gilded Quill</span><span class="chip host-chip">Host · Room ' + ROOM + '</span></header>';
   var st = ph.st;
   if (!st) {
     if (ph.status === "error" && ph.fails >= 2) return head + '<div class="p-card"><p class="p-big">Couldn’t connect</p><p class="muted">Check your internet. The page keeps trying on its own.</p></div>';
@@ -1801,7 +1803,7 @@ function viewHeader() {
   var buttons = '<div class="header-btns">' + netPill + undoBtn +
     '<button class="btn ghost menu-btn" data-action="openMenu" aria-haspopup="dialog">' +
     '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>Menu</button></div>';
-  return '<header class="top"><h1><img class="emblem" src="assets/emblem.svg" alt="">Quizzards</h1><div class="scores">' + cards + buttons + '</div></header>';
+  return '<header class="top"><h1><img class="emblem" src="assets/emblem.svg" alt=""><span class="brand"><span class="t-the">The</span> Gilded Quill</span></h1><div class="scores">' + cards + buttons + '</div></header>';
 }
 
 function viewMenu() {

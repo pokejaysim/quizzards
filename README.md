@@ -1,4 +1,4 @@
-# Quizzards
+# The Gilded Quill
 
 A wizard-themed trivia board game for game night, played by four houses.
 
