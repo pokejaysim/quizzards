@@ -206,6 +206,42 @@ h1{display:flex;align-items:center;gap:14px;margin:0;font-family:Cinzel,Georgia,
 .h-wager-row input{flex:1;min-height:48px;padding:0 12px;background:var(--card);color:var(--text);border:1px solid var(--line2);border-radius:10px;font-family:inherit;font-size:18px}
 .h-rank{display:flex;align-items:center;gap:8px;font-size:18px}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.crest{display:block;object-fit:contain;flex:none}
+.score.has-crest{min-width:150px}
+.score-body{display:flex;align-items:center;gap:10px;padding:6px 16px 0 12px}
+.score-text{display:flex;flex-direction:column;gap:2px}
+.score-text .score-name,.score-text .score-num{padding:0}
+.score-crest{width:40px;height:48px}
+.banner-crest{width:44px;height:54px}
+.head{flex-direction:column;gap:6px;min-height:104px;padding:10px 8px;background:linear-gradient(rgba(35,42,74,.55),rgba(35,42,74,.75)),url(assets/art/texture.webp) center/cover}
+.head-icon{width:46px;height:46px;object-fit:contain;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4))}
+.tile{display:flex;align-items:center;justify-content:center;min-height:56px;padding:4px;background:linear-gradient(rgba(30,36,64,.35),rgba(30,36,64,.55)),url(assets/art/texture.webp) center/cover;transition:transform .12s ease,border-color .12s ease}
+.tile:hover{transform:translateY(-2px)}
+.tile-num{height:40px;width:auto;max-width:90%;object-fit:contain;filter:drop-shadow(0 2px 2px rgba(0,0,0,.45))}
+.tile.used{background:#171B30}
+.card{background:linear-gradient(rgba(30,36,64,.55),rgba(30,36,64,.72)),url(assets/art/texture.webp) center/cover}
+.cat-chip{display:inline-flex;align-items:center;gap:8px;padding:4px 14px 4px 6px}
+.chip-icon{width:30px;height:30px;object-fit:contain}
+.sort-hat{width:180px;height:auto;filter:drop-shadow(0 6px 12px rgba(0,0,0,.45))}
+.sort-hat.thinking{animation:hatwobble .5s ease-in-out infinite alternate;transform-origin:50% 90%}
+.hat-result{display:flex;flex-direction:column;align-items:center;gap:10px}
+.reveal-crest{width:120px;height:146px;animation:pop .45s cubic-bezier(.2,1.4,.4,1) both}
+.roster-head{display:flex;align-items:center;gap:10px;padding:12px 16px 4px}
+.roster-head .roster-name{padding:0}
+.roster-crest{width:46px;height:56px}
+.splash-crests{display:flex;gap:16px;justify-content:center;animation:rise .7s cubic-bezier(.2,1.4,.4,1) both}
+.splash-crest{width:150px;height:184px;filter:drop-shadow(0 0 30px color-mix(in srgb,var(--house) 60%,transparent))}
+.splash-crest.small{width:96px;height:118px}
+.splash .trophy{width:72px;height:72px}
+.p-house{flex-direction:row;justify-content:center;gap:14px;padding:16px;background:color-mix(in srgb,var(--house) 26%,#1E2440);border:2px solid var(--house);color:var(--text)}
+.p-house-text{display:flex;flex-direction:column;align-items:flex-start}
+.p-crest{width:64px;height:78px}
+.p-head{flex-direction:column;gap:2px;min-height:56px}
+.p-head-icon{width:24px;height:24px;object-fit:contain}
+.p-tile{display:flex;align-items:center;justify-content:center;padding:2px}
+.p-num{height:30px;width:auto;max-width:92%;object-fit:contain}
+@keyframes hatwobble{from{transform:rotate(-4deg)}to{transform:rotate(4deg)}}
+@media (prefers-reduced-motion:reduce){.sort-hat.thinking,.reveal-crest,.splash-crests{animation:none}.tile:hover{transform:none}}
 body.phone #app{max-width:520px;padding:20px 16px 40px;gap:16px}
 .p-top{display:flex;justify-content:space-between;align-items:center}
 .p-brand{font-family:Cinzel,Georgia,serif;font-weight:700;font-size:24px;color:var(--accent)}
@@ -214,7 +250,7 @@ body.phone #app{max-width:520px;padding:20px 16px 40px;gap:16px}
 .p-card input{width:100%;min-height:52px;padding:0 14px;background:var(--bg);color:var(--text);border:1px solid var(--line2);border-radius:12px;font-family:inherit;font-size:18px}
 .p-wide{align-self:stretch;width:100%}
 .p-big{margin:0;font-size:24px;font-weight:700;line-height:1.3}
-.p-house{display:flex;flex-direction:column;gap:2px;align-items:center;padding:22px 16px;border-radius:20px;color:#14182B}
+.p-house{display:flex;flex-direction:column;gap:2px;align-items:center;padding:22px 16px;border-radius:20px}
 .p-house-name{font-family:Cinzel,Georgia,serif;font-weight:700;font-size:34px}
 .p-house-sub{font-size:15px;font-weight:600}
 .buzzer{width:min(56vw,220px);height:min(56vw,220px);border-radius:50%;border:6px solid rgba(255,255,255,.35);color:#14182B;font-size:28px;font-weight:700;box-shadow:0 10px 0 rgba(0,0,0,.35);touch-action:manipulation}
@@ -228,11 +264,17 @@ body.phone #app{max-width:520px;padding:20px 16px 40px;gap:16px}
 <canvas id="confetti" aria-hidden="true"></canvas>
 <script>
 var HOUSES = [
-  { name: "Gryffindor", color: "#D6453D" },
-  { name: "Hufflepuff", color: "#ECB939" },
-  { name: "Ravenclaw", color: "#6E93E0" },
-  { name: "Slytherin", color: "#4FA36A" }
+  { name: "Gryffindor", color: "#D6453D", crest: "assets/art/crest-gryffindor.webp" },
+  { name: "Hufflepuff", color: "#ECB939", crest: "assets/art/crest-hufflepuff.webp" },
+  { name: "Ravenclaw", color: "#6E93E0", crest: "assets/art/crest-ravenclaw.webp" },
+  { name: "Slytherin", color: "#4FA36A", crest: "assets/art/crest-slytherin.webp" }
 ];
+
+// Hand-painted artwork. Icons follow the category order in questions.js.
+var CAT_ICONS = ["spells", "hogwarts", "characters", "creatures", "quidditch", "potions"];
+function crestImg(h, cls) { return '<img class="crest ' + (cls || '') + '" src="' + HOUSES[h].crest + '" alt="">'; }
+function catIcon(ci, cls) { return CAT_ICONS[ci] ? '<img class="cat-icon ' + (cls || '') + '" src="assets/art/icon-' + CAT_ICONS[ci] + '.webp" alt="">' : ''; }
+function numImg(v, cls) { return '<img class="num ' + (cls || '') + '" src="assets/art/n' + v + '.webp" alt="">'; }
 
 var SEEN_KEY = "quizzards-seen-v1";
 function loadSeen() {
@@ -735,7 +777,7 @@ function viewSplash() {
     '<path d="M34 26H20c0 16 8 24 18 26"></path><path d="M86 26h14c0 16-8 24-18 26"></path>' +
     '<path d="M60 72v16"></path><path d="M44 102h32l-4-14H48z" fill="rgba(226,184,87,.18)"></path><path d="M38 104h44"></path></svg>';
   return '<div class="splash" role="dialog" aria-modal="true" aria-labelledby="splash-title" style="--house:' + color + '">' +
-    '<div class="splash-inner">' + trophy +
+    '<div class="splash-inner"><div class="splash-crests">' + w.map(function (i) { return crestImg(i, 'splash-crest' + (single ? '' : ' small')); }).join("") + '</div>' + trophy +
     '<span class="eyebrow accent">' + (single ? 'The House Cup goes to' : 'It’s a tie! The House Cup is shared by') + '</span>' +
     '<h2 id="splash-title" class="splash-title' + (single ? '' : ' tie') + '">' + title + '</h2>' +
     '<span class="splash-score">' + state.scores[w[0]] + ' points</span>' +
@@ -1174,8 +1216,8 @@ function phoneView() {
     return head + '<div class="p-card"><p class="p-big">' + waitMsg + '</p><p class="muted">Watch the big screen.</p></div>';
   }
   var h = HOUSES[me.house];
-  var badge = '<div class="p-house" style="background:' + h.color + '"><span class="p-house-name">' + h.name + '</span>' +
-    '<span class="p-house-sub">' + esc(me.name) + ' · ' + st.scores[me.house] + ' points</span></div>';
+  var badge = '<div class="p-house" style="--house:' + h.color + '">' + crestImg(me.house, 'p-crest') + '<div class="p-house-text"><span class="p-house-name">' + h.name + '</span>' +
+    '<span class="p-house-sub">' + esc(me.name) + ' · ' + st.scores[me.house] + ' points</span></div></div>';
   var body;
   var myTurn = st.turn === me.house;
   if (st.phase === "sorting" || st.phase === "rosters" || st.phase === "lobby") {
@@ -1187,10 +1229,10 @@ function phoneView() {
     if (!left) {
       body = '<p class="p-big">Board cleared!</p><p class="muted">The final question is next.</p>';
     } else if (myTurn) {
-      var grid = CATS.map(function (c) { return '<div class="p-head">' + esc(c.name) + '</div>'; }).join("");
+      var grid = CATS.map(function (c, ci) { return '<div class="p-head">' + catIcon(ci, 'p-head-icon') + '<span>' + esc(c.name) + '</span></div>'; }).join("");
       for (var v = 1; v <= 10; v++) for (var ci = 0; ci < CATS.length; ci++) {
         grid += usedMap[ci + "-" + v] ? '<div class="p-tile used" aria-hidden="true"></div>'
-          : '<button class="p-tile" data-cat="' + ci + '" data-v="' + v + '" aria-label="' + esc(CATS[ci].name) + ' for ' + v + '">' + v + '</button>';
+          : '<button class="p-tile" data-cat="' + ci + '" data-v="' + v + '" aria-label="' + esc(CATS[ci].name) + ' for ' + v + '">' + numImg(v, 'p-num') + '</button>';
       }
       return head + badge + '<div class="p-card tight"><p class="p-big">Your house picks!</p>' +
         '<p class="muted small">Tap a tile. 1 is easiest, 10 is hardest.</p><div class="p-board">' + grid + '</div></div>';
@@ -1291,10 +1333,10 @@ function hostPhoneView() {
     } else {
       var used = {};
       (st.used || []).forEach(function (k) { used[k] = true; });
-      var grid = CATS.map(function (c) { return '<div class="p-head">' + esc(c.name) + '</div>'; }).join("");
+      var grid = CATS.map(function (c, ci) { return '<div class="p-head">' + catIcon(ci, 'p-head-icon') + '<span>' + esc(c.name) + '</span></div>'; }).join("");
       for (var v = 1; v <= 10; v++) for (var ci = 0; ci < CATS.length; ci++) {
         grid += used[ci + "-" + v] ? '<div class="p-tile used" aria-hidden="true"></div>'
-          : '<button class="p-tile" data-cmd="pick" data-cat="' + ci + '" data-v="' + v + '" aria-label="' + esc(CATS[ci].name) + ' for ' + v + '">' + v + '</button>';
+          : '<button class="p-tile" data-cmd="pick" data-cat="' + ci + '" data-v="' + v + '" aria-label="' + esc(CATS[ci].name) + ' for ' + v + '">' + numImg(v, 'p-num') + '</button>';
       }
       return head + scores + '<div class="p-card tight"><p class="p-big">' + HOUSES[st.turn].name + ' is picking</p>' +
         '<p class="muted small">Their phones can pick, or tap a tile here for them.</p><div class="p-board">' + grid + '</div>' +
@@ -1660,8 +1702,8 @@ function viewHeader() {
   var cards = playing ? teams.active.map(function (i) {
     var h = HOUSES[i];
     var isTurn = state.screen === "board" && i === turnHouse();
-    return '<div class="score' + (isTurn ? ' is-turn' : '') + '"><span class="bar" style="background:' + h.color + '"></span>' +
-      '<span class="score-name">' + h.name + '</span><span class="score-num">' + state.scores[i] + '</span></div>';
+    return '<div class="score has-crest' + (isTurn ? ' is-turn' : '') + '"><span class="bar" style="background:' + h.color + '"></span>' +
+      '<div class="score-body">' + crestImg(i, 'score-crest') + '<div class="score-text"><span class="score-name">' + h.name + '</span><span class="score-num">' + state.scores[i] + '</span></div></div></div>';
   }).join("") : "";
   var netPill = net.on && net.status !== "on" ? '<span class="net-pill" role="status">Phones reconnecting…</span>'
     : hostOnline() ? '<span class="host-pill">Host on phone</span>' : '';
@@ -1763,8 +1805,9 @@ function viewSetup() {
     var last = state.revealIdx === total - 1;
     var result = state.thinking
       ? '<span class="hat-thinking">Hmm, difficult. Very difficult…</span>'
-      : '<span class="hat-house" style="color:' + HOUSES[p.house].color + '">' + HOUSES[p.house].name.toUpperCase() + '!</span>';
+      : '<span class="hat-result">' + crestImg(p.house, 'reveal-crest') + '<span class="hat-house" style="color:' + HOUSES[p.house].color + '">' + HOUSES[p.house].name.toUpperCase() + '!</span></span>';
     return '<section class="narrow"><div class="card hat-card">' +
+      '<img class="sort-hat' + (state.thinking ? ' thinking' : '') + '" src="assets/art/hat.webp" alt="">' +
       '<span class="eyebrow">Player ' + (state.revealIdx + 1) + ' of ' + total + '</span>' +
       '<span class="hat-name">' + esc(p.name) + '</span>' + result +
       '<div class="row center-row">' +
@@ -1775,7 +1818,7 @@ function viewSetup() {
   var cols = teams.active.map(function (h) {
     var names = membersOf(h).map(function (n) { return '<li>' + esc(n) + '</li>'; }).join("");
     return '<div class="roster"><span class="bar" style="background:' + HOUSES[h].color + '"></span>' +
-      '<span class="roster-name">' + HOUSES[h].name + '</span><ul>' + names + '</ul></div>';
+      '<div class="roster-head">' + crestImg(h, 'roster-crest') + '<span class="roster-name">' + HOUSES[h].name + '</span></div><ul>' + names + '</ul></div>';
   }).join("");
   return '<section class="stack"><div class="stack-sm"><span class="final-title">Your houses</span>' +
     '<p class="muted">Sit with your house. Each house takes turns picking from the board.</p></div>' +
@@ -1788,14 +1831,14 @@ function viewSetup() {
 function viewTurnBanner() {
   var h = turnHouse();
   var members = membersOf(h);
-  return '<div class="turn-banner" style="border-color:' + HOUSES[h].color + '"><span class="pip big-pip" style="background:' + HOUSES[h].color + '"></span>' +
+  return '<div class="turn-banner" style="border-color:' + HOUSES[h].color + '">' + crestImg(h, 'banner-crest') +
     '<div class="turn-text"><span class="turn-name">' + HOUSES[h].name + '’s turn to pick</span>' +
     (members.length ? '<span class="muted small">' + members.map(esc).join(", ") + '</span>' : '') +
     '</div></div>';
 }
 
 function viewBoard() {
-  var heads = CATS.map(function (c) { return '<div class="head">' + esc(c.name) + '</div>'; }).join("");
+  var heads = CATS.map(function (c, ci) { return '<div class="head">' + catIcon(ci, 'head-icon') + '<span>' + esc(c.name) + '</span></div>'; }).join("");
   var tiles = "";
   for (var v = 1; v <= 10; v++) {
     for (var ci = 0; ci < CATS.length; ci++) {
@@ -1803,7 +1846,7 @@ function viewBoard() {
         tiles += '<div class="tile used" aria-hidden="true"></div>';
       } else {
         tiles += '<button class="tile" data-action="pick" data-cat="' + ci + '" data-v="' + v + '" aria-label="' +
-          esc(CATS[ci].name) + ' for ' + v + (v === 1 ? ' point' : ' points') + '">' + v + '</button>';
+          esc(CATS[ci].name) + ' for ' + v + (v === 1 ? ' point' : ' points') + '">' + numImg(v, 'tile-num') + '</button>';
       }
     }
   }
@@ -1881,7 +1924,7 @@ function viewQuestion() {
   }
   return '<section class="narrow"><button class="back" data-action="back">' +
     '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>Back to the board</button>' +
-    '<div class="card"><div class="meta"><span class="chip">' + esc(c.name) + '</span><div class="meta-right"><span class="muted small">Difficulty</span>' +
+    '<div class="card"><div class="meta"><span class="chip cat-chip">' + catIcon(state.cat, 'chip-icon') + esc(c.name) + '</span><div class="meta-right"><span class="muted small">Difficulty</span>' +
     '<span class="dots">' + dots + '</span><span class="pts">' + state.v + (state.v === 1 ? ' point' : ' points') + '</span></div></div>' +
     '<p class="question">' + esc(pair[0]) + '</p>' + body + '</div></section>';
 }
