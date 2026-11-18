@@ -177,6 +177,35 @@ h1{display:flex;align-items:center;gap:14px;margin:0;font-family:Cinzel,Georgia,
 .p-timer{align-self:stretch}
 .p-timer .timer-num{min-width:0;font-size:20px}
 @media (prefers-reduced-motion:reduce){.timer-fill{transition:none}}
+.host-block{display:flex;flex-direction:column;gap:8px;padding-top:4px}
+.host-qr-wrap{flex-direction:row;flex-wrap:wrap;align-items:center;gap:20px;padding:16px;background:var(--bg);border:1px dashed var(--accent);border-radius:16px}
+.small-qr{width:132px;height:132px}
+.host-qr-wrap .join-text{flex:1 1 280px}
+.host-ok{font-weight:700;color:#8FD3A6}
+.host-pill{align-self:center;padding:8px 14px;border-radius:999px;background:#1F3A2C;color:#BDE8CB;font-size:14px;font-weight:600}
+.host-chip{background:#3A3216;color:var(--accent)}
+.steal-banner{display:flex;flex-direction:column;gap:8px;padding:18px 22px;background:var(--bg);border:2px solid var(--accent);border-radius:16px;animation:pop .3s ease-out}
+.steal-title{font-family:Cinzel,Georgia,serif;font-weight:700;font-size:28px;color:var(--accent)}
+.steal-timer .timer-fill{background:#7FB3E0}
+.answering{margin:0;font-size:22px}
+.q-log{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;font-size:16px;font-weight:600;align-self:stretch;text-align:left}
+.q-log li{display:flex;align-items:center;gap:8px}
+.big-log{font-size:18px}
+.btn.right-btn{background:#2F7D4F;border-color:#2F7D4F}
+.btn.wrong-btn{background:#B23A35;border-color:#B23A35}
+.tv-judge summary{cursor:pointer;color:var(--muted);font-size:15px;font-weight:600;min-height:44px;display:flex;align-items:center}
+.tv-judge[open] summary{margin-bottom:8px}
+.judge-pair{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-self:stretch}
+.judge-btn{min-height:64px;font-size:18px;font-weight:700}
+.judge-btn.right-btn,.judge-btn.wrong-btn{color:#fff}
+.h-scores{display:flex;flex-wrap:wrap;gap:8px 14px;justify-content:center;font-size:15px}
+.h-score{display:inline-flex;align-items:center;gap:6px}
+.h-wager,.h-judge{display:flex;flex-direction:column;gap:6px;align-self:stretch;padding:12px;background:var(--bg);border:1px solid var(--line);border-radius:12px;text-align:left}
+.h-wager-name{display:flex;align-items:center;gap:8px;font-weight:700;flex-wrap:wrap}
+.h-wager-row{display:flex;gap:8px}
+.h-wager-row input{flex:1;min-height:48px;padding:0 12px;background:var(--card);color:var(--text);border:1px solid var(--line2);border-radius:10px;font-family:inherit;font-size:18px}
+.h-rank{display:flex;align-items:center;gap:8px;font-size:18px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 body.phone #app{max-width:520px;padding:20px 16px 40px;gap:16px}
 .p-top{display:flex;justify-content:space-between;align-items:center}
 .p-brand{font-family:Cinzel,Georgia,serif;font-weight:700;font-size:24px;color:var(--accent)}
@@ -269,6 +298,9 @@ function fresh() {
   return {
     screen: "board", setupStep: "names", revealIdx: 0, thinking: false,
     cat: 0, v: 1, revealed: false,
+    // Question flow: qMode "host" (judged on the host phone) or "classic" (judged on this screen).
+    // qStage "answer" (a house is answering), "steal" (buzzers open) or done once revealed.
+    qMode: "classic", qStage: "answer", qAnswering: null, qTried: [], qLog: [], qBuzz: null, timerKind: "answer",
     turn: Math.floor(Math.random() * teams.active.length),
     scores: [0, 0, 0, 0], used: {}, deal: deal, finalIdx: finalIdx,
     finalStep: "wager", wagers: ["", "", "", ""], judged: [null, null, null, null], before: [0, 0, 0, 0], splash: false
@@ -288,10 +320,12 @@ function markSeen(key) {
 
 // ----- Answer timer -----
 var tickState = { lastSecs: null, upPlayed: false };
-function timerStart() {
+var STEAL_MS = 10000;
+function timerStart(kind) {
   tickState = { lastSecs: null, upPlayed: false };
+  state.timerKind = kind || "answer";
   if (!timerSecs) { state.timerEnd = null; state.timerLeft = null; state.timerTotal = 0; return; }
-  state.timerTotal = timerSecs * 1000;
+  state.timerTotal = state.timerKind === "steal" ? STEAL_MS : timerSecs * 1000;
   state.timerEnd = Date.now() + state.timerTotal;
   state.timerLeft = null;
 }
@@ -304,6 +338,7 @@ function timerRemaining() {
 function timerActive() {
   return (state.screen === "question" && !state.revealed) || (state.screen === "final" && state.finalStep === "question");
 }
+function timerPaused() { return state.timerLeft !== null && state.timerLeft !== undefined; }
 function paintTimer(el, rem, total, paused) {
   if (!el) return;
   var secs = Math.ceil(rem / 1000);
@@ -319,9 +354,79 @@ var TIMER_HTML = '<div class="timer-track" aria-hidden="true"><span class="timer
 function openQuestion(cat, v) {
   net.buzz = [];
   state.cat = cat; state.v = v; state.revealed = false; state.screen = "question";
-  timerStart();
+  state.qMode = hostOnline() ? "host" : "classic";
+  state.qStage = "answer";
+  state.qAnswering = turnHouse();
+  state.qTried = []; state.qLog = []; state.qBuzz = null;
+  timerStart("answer");
   sfx("open");
   render();
+}
+
+function currentPair() { return CATS[state.cat].qs[state.v - 1][state.deal[state.cat][state.v - 1]]; }
+
+// The house answering is judged. The first house loses nothing for a miss;
+// a house that steals and gets it wrong loses the tile's value.
+function judgeAnswer(ok) {
+  if (state.screen !== "question" || state.revealed || state.qStage !== "answer" || state.qAnswering === null) return;
+  var h = state.qAnswering;
+  var steal = h !== turnHouse();
+  var d = ok ? state.v : (steal ? -state.v : 0);
+  pushUndo(HOUSES[h].name + (ok ? " right" : " wrong") + (d ? " (" + (d > 0 ? "+" : "−") + Math.abs(d) + ")" : ""));
+  state.scores = state.scores.slice();
+  state.scores[h] += d;
+  state.qLog = state.qLog.concat([{ h: h, ok: ok, d: d, steal: steal }]);
+  sfx(ok ? "right" : "wrong");
+  if (ok) { finishQuestion(); return; }
+  state.qTried = state.qTried.concat([h]);
+  if (stealers().length) openSteal(); else finishQuestion();
+}
+
+function stealers() {
+  return teams.active.filter(function (h) { return state.qTried.indexOf(h) < 0; });
+}
+
+function openSteal() {
+  state.qStage = "steal";
+  state.qAnswering = null;
+  state.qBuzz = null;
+  net.buzz = [];
+  timerStart("steal");
+  render();
+}
+
+function takeSteal(house, name) {
+  if (state.screen !== "question" || state.revealed || state.qStage !== "steal") return;
+  if (stealers().indexOf(house) < 0) return;
+  state.qStage = "answer";
+  state.qAnswering = house;
+  state.qBuzz = { house: house, name: name || "" };
+  timerStart("answer");
+  sfx("buzz");
+  render();
+}
+
+function finishQuestion() {
+  timerStop();
+  state.revealed = true;
+  state.qStage = "done";
+  state.qAnswering = null;
+  markSeen(state.cat + "-" + (state.v - 1) + "-" + state.deal[state.cat][state.v - 1]);
+  render();
+}
+
+function nextTurn() {
+  var used = Object.assign({}, state.used);
+  used[state.cat + "-" + state.v] = true;
+  net.buzz = [];
+  timerStop();
+  setState({ used: used, screen: "board", revealed: false, qStage: "answer", turn: (state.turn + 1) % teams.active.length });
+}
+
+function logLine(e) {
+  var n = HOUSES[e.h].name;
+  if (e.ok) return (e.steal ? n + " stole it! +" : n + " got it! +") + Math.abs(e.d);
+  return e.steal ? n + " missed the steal. −" + Math.abs(e.d) : n + " missed.";
 }
 
 // ----- Undo -----
@@ -342,7 +447,7 @@ function saveGame() {
     window.localStorage.setItem(SAVE_KEY, JSON.stringify({
       v: 1, at: Date.now(), state: copy,
       teams: { players: teams.players, sorted: teams.sorted, active: teams.active },
-      room: net.on ? { code: net.code, ids: net.ids } : null
+      room: net.on ? { code: net.code, ids: net.ids, hostKey: net.hostKey } : null
     }));
   } catch (e) {}
 }
@@ -364,6 +469,7 @@ function restoreSave(sv) {
   // A running timer comes back paused, so nobody loses time to the reload.
   if (state.timerEnd) { state.timerLeft = Math.max(0, state.timerEnd - Date.now()); state.timerEnd = null; }
   if (sv.room && /^[A-Z]{4}$/.test(sv.room.code)) {
+    if (/^[a-z0-9]{6,16}$/.test(sv.room.hostKey || "")) net.hostKey = sv.room.hostKey;
     Object.keys(sv.room.ids || {}).forEach(function (id) { if (teams.players.indexOf(sv.room.ids[id]) >= 0) net.ids[id] = sv.room.ids[id]; });
     enablePhones(sv.room.code);
   }
@@ -646,8 +752,12 @@ var SUPA_KEY = "sb_publishable_lGH-X4gotyQP24ASvy2EOA_GWsgAR_M";
 var ROOM = (function () {
   try { var r = new URLSearchParams(window.location.search).get("room"); return r ? r.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 6) : ""; } catch (e) { return ""; }
 })();
+var HOSTKEY = (function () {
+  try { var k = new URLSearchParams(window.location.search).get("host"); return k && /^[a-z0-9]{6,16}$/.test(k) ? k : ""; } catch (e) { return ""; }
+})();
 var phoneMode = !!ROOM;
-var net = { on: false, code: "", channel: null, status: "off", ids: {}, buzz: [], beat: null, qr: "", gen: 0, fails: 0, retryTimer: null, slowTimer: null, fin: { wagerBy: [null, null, null, null], answers: [null, null, null, null] } };
+var hostPhone = phoneMode && !!HOSTKEY;
+var net = { hostKey: "", hostSeen: 0, hchannel: null, hostQr: "", showHostQr: false, on: false, code: "", channel: null, status: "off", ids: {}, buzz: [], beat: null, qr: "", gen: 0, fails: 0, retryTimer: null, slowTimer: null, fin: { wagerBy: [null, null, null, null], answers: [null, null, null, null] } };
 function resetFin() { net.fin = { wagerBy: [null, null, null, null], answers: [null, null, null, null] }; }
 
 function loadScript(src) {
@@ -714,9 +824,13 @@ function hostSnapshot() {
   return {
     used: Object.keys(state.used),
     // Phones get the question when it opens. The answer is only sent after the reveal.
-    q: qPair ? { cat: CATS[state.cat].name, v: state.v, text: qPair[0], answer: state.revealed ? qPair[1] : null } : null,
+    q: qPair ? {
+      cat: CATS[state.cat].name, v: state.v, text: qPair[0], answer: state.revealed ? qPair[1] : null,
+      mode: state.qMode, stage: state.revealed ? "done" : state.qStage, answering: state.qAnswering,
+      tried: state.qTried, buzz: state.qBuzz, log: state.qLog, first: turnHouse()
+    } : null,
     t: "state", phase: phase, players: players, scores: state.scores, active: teams.active,
-    turn: turnHouse(), buzz: net.buzz, winners: phase === "results" ? winners() : null,
+    turn: turnHouse(), host: hostOnline(), winners: phase === "results" ? winners() : null,
     // Only who submitted is shared, never the wager or answer itself.
     fin: state.screen === "final" ? {
       step: state.finalStep,
@@ -731,9 +845,90 @@ function hostSnapshot() {
   };
 }
 
+function hostOnline() { return net.on && Date.now() - net.hostSeen < 12000; }
+
 function hostBroadcast() {
   if (!net.on) return;
-  if (net.status === "on") netSend(net.channel, hostSnapshot());
+  if (net.status !== "on") return;
+  netSend(net.channel, hostSnapshot());
+  if (net.hchannel) netSend(net.hchannel, hostPrivateSnapshot());
+}
+
+// What only the host phone sees: the answer, the wagers and the typed final answers.
+function hostPrivateSnapshot() {
+  var snap = hostSnapshot();
+  snap.t = "hstate";
+  if (snap.q) snap.q.answer = currentPair()[1];
+  var fq = FINALS[state.finalIdx];
+  if (snap.fin) {
+    snap.fin.q = fq.q;
+    snap.fin.a = fq.a;
+    snap.fin.wagers = state.wagers;
+    snap.fin.answers = net.fin.answers.map(function (a) { return a ? a.text : null; });
+    snap.fin.judged = state.judged;
+  }
+  snap.undo = undoStack.length ? undoStack[undoStack.length - 1].label : null;
+  snap.boardDone = usedCount() === CATS.length * 10;
+  return snap;
+}
+
+function hostPrivOnMsg(p) {
+  if (!p) return;
+  if (p.t === "hhello") {
+    var was = hostOnline();
+    net.hostSeen = Date.now();
+    // A question opened before the host phone joined switches over to it.
+    if (state.screen === "question" && !state.revealed && state.qMode === "classic" && !state.qLog.length) state.qMode = "host";
+    if (!was) render(); else netSend(net.hchannel, hostPrivateSnapshot());
+    return;
+  }
+  if (p.t !== "cmd") return;
+  net.hostSeen = Date.now();
+  var a = p.act;
+  if (a === "correct") judgeAnswer(true);
+  else if (a === "wrong") judgeAnswer(false);
+  else if (a === "noSteal") { if (state.screen === "question" && !state.revealed) finishQuestion(); }
+  else if (a === "next") { if (state.screen === "question" && state.revealed) nextTurn(); }
+  else if (a === "pick") {
+    var c = parseInt(p.cat, 10), v = parseInt(p.v, 10);
+    if (state.screen === "board" && c >= 0 && c < CATS.length && v >= 1 && v <= 10 && !state.used[c + "-" + v]) openQuestion(c, v);
+  }
+  else if (a === "timerPause") { if (timerActive()) actions.timerPause(); }
+  else if (a === "timerAdd") { if (timerActive()) actions.timerAdd(); }
+  else if (a === "undo") actions.undo();
+  else if (a === "startFinal") { if (state.screen === "board") actions.startFinal(); }
+  else if (a === "setWager") {
+    var h = parseInt(p.house, 10), n = parseInt(p.amount, 10);
+    if (state.screen === "final" && state.finalStep === "wager" && teams.active.indexOf(h) >= 0 && !isNaN(n)) {
+      state.wagers[h] = String(Math.min(Math.max(n, 0), maxWager(h)));
+      net.fin.wagerBy[h] = null;
+      renderKeepingFocus();
+    }
+  }
+  else if (a === "lockWagers") { if (state.screen === "final" && state.finalStep === "wager") actions.lockWagers(); }
+  else if (a === "revealFinal") { if (state.screen === "final" && state.finalStep === "question") actions.revealFinal(); }
+  else if (a === "judge") {
+    var jh = parseInt(p.house, 10);
+    if (state.screen === "final" && state.finalStep === "judge" && teams.active.indexOf(jh) >= 0) {
+      var arr = state.judged.slice(); arr[jh] = !!p.right; setState({ judged: arr });
+    }
+  }
+  else if (a === "finishFinal") {
+    if (state.screen === "final" && state.finalStep === "judge" && teams.active.every(function (i) { return state.judged[i] !== null; })) actions.finishFinal();
+  }
+}
+
+function genHostKey() {
+  var k = "", chars = "abcdefghijkmnpqrstuvwxyz23456789";
+  for (var i = 0; i < 10; i++) k += chars[Math.floor(Math.random() * chars.length)];
+  return k;
+}
+
+function hostUrl() { return joinUrl() + "&host=" + net.hostKey; }
+
+function refreshHostQr() {
+  net.hostQr = "";
+  makeQr(hostUrl()).then(function (svg) { net.hostQr = svg; renderKeepingInput(); }).catch(function () {});
 }
 
 function renderKeepingInput() {
@@ -809,12 +1004,8 @@ function hostOnMsg(p) {
   if (p.t === "buzz" && typeof p.id === "string") {
     var who = net.ids[p.id];
     var h = who ? houseOfName(who) : null;
-    if (!h || state.screen !== "question" || state.revealed) return;
-    if (h.house === turnHouse()) return;
-    if (net.buzz.some(function (b) { return b.house === h.house; })) return;
-    net.buzz.push({ id: p.id, name: who, house: h.house });
-    sfx("buzz");
-    render();
+    if (!h || state.qMode !== "host") return;
+    takeSteal(h.house, who);
   }
 }
 
@@ -854,6 +1045,11 @@ function hostConnect() {
   }).then(function (ch) {
     if (gen !== net.gen) { closeChannel(ch); return; }
     net.channel = ch;
+    if (net.hchannel) { closeChannel(net.hchannel); net.hchannel = null; }
+    return openChannel(net.code + "-h-" + net.hostKey, hostPrivOnMsg, function () {}).then(function (hc) {
+      if (gen !== net.gen) { closeChannel(hc); return; }
+      net.hchannel = hc;
+    });
   }).catch(function () {
     if (gen !== net.gen) return;
     net.status = "error"; net.fails++; renderKeepingInput(); hostRetry();
@@ -872,6 +1068,7 @@ function enablePhones(savedCode) {
   for (var i = 0; !savedCode && i < 4; i++) code += letters[Math.floor(Math.random() * letters.length)];
   net.on = true;
   net.code = code;
+  if (!net.hostKey) net.hostKey = genHostKey();
   render();
   makeQr(joinUrl()).then(function (svg) { net.qr = svg; renderKeepingInput(); }).catch(function () {});
   hostConnect();
@@ -893,25 +1090,28 @@ function viewJoinPanel() {
     '<span class="muted">Scan the code, or open this page and add</span>' +
     '<span class="join-url">?room=<strong>' + net.code + '</strong></span>' +
     '<span class="join-code" aria-label="Room code ' + net.code.split("").join(" ") + '">' + net.code + '</span>' +
-    '<span class="muted small">' + status + (phones ? ' · ' + phones + (phones === 1 ? ' phone' : ' phones') + ' joined' : '') + '</span></div></div>';
+    '<span class="muted small">' + status + (phones ? ' · ' + phones + (phones === 1 ? ' phone' : ' phones') + ' joined' : '') + '</span></div></div>' +
+    viewHostPhoneBlock();
+}
+
+function viewHostPhoneBlock() {
+  if (!net.on) return "";
+  if (hostOnline()) {
+    return '<div class="host-block"><span class="host-ok">Host phone connected</span>' +
+      '<span class="muted small">The host sees each answer privately and judges from their phone.</span></div>';
+  }
+  if (!net.showHostQr) {
+    return '<div class="host-block"><div class="row"><button class="btn" data-action="showHostQr">Set up the host phone</button></div>' +
+      '<span class="muted small">The host sees the answers and taps Correct or Wrong. Without a host phone, you judge on this screen.</span></div>';
+  }
+  return '<div class="host-block host-qr-wrap"><div class="qr small-qr" role="img" aria-label="QR code for the host phone">' + (net.hostQr || "") + '</div>' +
+    '<div class="join-text"><span class="eyebrow accent">Host phone only</span>' +
+    '<span class="muted">Scan this on the host’s phone. It shows every answer, so keep it away from players.</span>' +
+    '<div class="row"><button class="btn ghost" data-action="hideHostQr">Hide</button>' +
+    '<button class="btn ghost" data-action="newHostLink">Make a new host link</button></div></div></div>';
 }
 
 var ORD = ["1st", "2nd", "3rd", "4th"];
-function viewBuzzBanner() {
-  if (!net.on || !Object.keys(net.ids).length || teams.active.length < 2) return "";
-  if (net.buzz.length) {
-    var first = HOUSES[net.buzz[0].house];
-    var line = net.buzz.map(function (b, k) {
-      return '<span class="buzz-item"><span class="pip" style="background:' + HOUSES[b.house].color + '"></span>' + ORD[k] + ': ' + HOUSES[b.house].name + ' (' + esc(b.name) + ')</span>';
-    }).join("");
-    return '<div class="buzz-banner" style="border-color:' + first.color + '">' +
-      '<div class="turn-text"><span class="turn-name">' + first.name + ' buzzed to steal!</span>' +
-      '<span class="buzz-line">' + line + '</span>' +
-      (state.revealed ? '' : '<span class="muted small">If ' + HOUSES[turnHouse()].name + ' misses, steals go in this order.</span>') + '</div>' +
-      (state.revealed ? '' : '<button class="btn ghost" data-action="clearBuzz">Clear buzzes</button>') + '</div>';
-  }
-  return state.revealed ? "" : '<p class="muted small">Buzzers are open. Other houses can buzz to line up a steal.</p>';
-}
 
 // ----- Phone side -----
 var ph = { id: "", name: "", channel: null, status: "connecting", st: null, lastSeen: 0, wantJoin: false, html: "", buzzed: false, myWager: null, myAnswer: null, gen: 0, fails: 0, retry: null, timer: null, lastKick: 0 };
@@ -998,23 +1198,38 @@ function phoneView() {
       body = '<p class="p-big">' + HOUSES[st.turn].name + ' is picking…</p>';
     }
   } else if (st.phase === "question" || st.phase === "revealed") {
-    var q = st.q || { cat: "", v: 0, text: "", answer: null };
+    var q = st.q || { cat: "", v: 0, text: "", answer: null, log: [], tried: [] };
     var qBlock = '<span class="chip">' + esc(q.cat) + ' · ' + q.v + (q.v === 1 ? ' point' : ' points') + '</span>' +
       '<p class="p-question">' + esc(q.text) + '</p>';
-    var line = st.buzz || [];
-    var place = -1;
-    line.forEach(function (b, k) { if (b.house === me.house) place = k; });
     if (st.phase === "question") qBlock += phoneTimerBlock();
+    var logHtml = (q.log || []).map(function (e) { return '<li>' + esc(logLine(e)) + '</li>'; }).join("");
+    logHtml = logHtml ? '<ul class="q-log">' + logHtml + '</ul>' : '';
+    var firstName = HOUSES[q.first] ? HOUSES[q.first].name : "";
     if (st.phase === "revealed") {
-      body = qBlock + '<div class="p-answer"><span class="eyebrow">Answer</span><span class="p-answer-text">' + esc(q.answer || "") + '</span></div>';
-    } else if (myTurn) {
-      body = qBlock + '<p class="p-big">Your house answers first.</p><p class="muted">Talk it over and say your answer out loud.</p>';
-    } else if (place >= 0) {
-      body = qBlock + '<p class="p-big">' + (line[place].id === ph.id ? 'You buzzed!' : esc(line[place].name) + ' buzzed for your house!') + '</p>' +
-        '<p class="muted">Your house is ' + ORD[place] + ' in line to steal if ' + HOUSES[st.turn].name + ' misses.</p>';
+      var gotIt = (q.log || []).some(function (e) { return e.ok; });
+      body = qBlock + '<div class="p-answer"><span class="eyebrow">Answer</span><span class="p-answer-text">' + esc(q.answer || "") + '</span></div>' +
+        logHtml + (gotIt || q.mode === "classic" ? '' : '<p class="muted">Nobody got this one.</p>');
+    } else if (q.mode !== "host") {
+      body = qBlock + (myTurn ? '<p class="p-big">Your house answers first.</p><p class="muted">Talk it over and say your answer out loud.</p>'
+        : '<p class="p-big">' + firstName + ' answers first.</p><p class="muted">If they miss, raise your hand to steal. A wrong steal costs ' + q.v + ' points.</p>') + logHtml;
+    } else if (q.stage === "steal") {
+      if ((q.tried || []).indexOf(me.house) >= 0) {
+        body = qBlock + logHtml + '<p class="p-big">Your house already answered.</p><p class="muted">The other houses can steal.</p>';
+      } else {
+        body = qBlock + logHtml + '<button class="buzzer" id="p-buzz" style="background:' + h.color + '">' + (ph.buzzed ? 'Buzzed…' : 'Buzz to steal') + '</button>' +
+          '<p class="muted">Right: +' + q.v + '. Wrong: −' + q.v + '. First house to buzz answers.</p>';
+      }
     } else {
-      body = qBlock + '<button class="buzzer" id="p-buzz" style="background:' + h.color + '">' + (ph.buzzed ? 'Buzzed…' : 'Buzz to steal') + '</button>' +
-        '<p class="muted">Know it? Buzz in to steal if ' + HOUSES[st.turn].name + ' misses.</p>';
+      var ans = q.answering, steal = ans !== q.first, ansName = HOUSES[ans] ? HOUSES[ans].name : "";
+      if (ans === me.house) {
+        body = qBlock + logHtml + (steal
+          ? '<p class="p-big">' + (q.buzz && q.buzz.name === me.name ? 'You buzzed first!' : 'Your house is stealing!') + '</p><p class="muted">Say your answer out loud. Right: +' + q.v + '. Wrong: −' + q.v + '.</p>'
+          : '<p class="p-big">Your house answers first.</p><p class="muted">Talk it over and say your answer out loud.</p>');
+      } else {
+        body = qBlock + logHtml + (steal
+          ? '<p class="p-big">' + ansName + ' is stealing.</p>' + (q.buzz && q.buzz.name ? '<p class="muted">' + esc(q.buzz.name) + ' buzzed first.</p>' : '')
+          : '<p class="p-big">' + ansName + ' is answering.</p><p class="muted">If they miss, your buzzer opens so you can steal.</p>');
+      }
     }
   } else if (st.phase === "final") {
     var f = st.fin || { step: "wager", max: [10, 10, 10, 10], wagerBy: [], answerBy: [] };
@@ -1048,9 +1263,111 @@ function phoneView() {
   return head + badge + '<div class="p-card">' + body + '</div>';
 }
 
+function hostCmd(act, extra) {
+  netSend(ph.channel, Object.assign({ t: "cmd", act: act }, extra || {}));
+}
+
+function hostPhoneView() {
+  var head = '<header class="p-top"><span class="p-brand">Quizzards</span><span class="chip host-chip">Host · Room ' + ROOM + '</span></header>';
+  var st = ph.st;
+  if (!st) {
+    if (ph.status === "error" && ph.fails >= 2) return head + '<div class="p-card"><p class="p-big">Couldn’t connect</p><p class="muted">Check your internet. The page keeps trying on its own.</p></div>';
+    return head + '<div class="p-card"><p class="p-big">Connecting to the big screen…</p><p class="muted">Keep the game open on the big screen.</p></div>';
+  }
+  if (ph.status !== "on" || Date.now() - ph.lastSeen > 9000) head += '<div class="p-conn" role="status">Reconnecting to the game…</div>';
+  var undo = st.undo ? '<button class="btn ghost p-wide" data-cmd="undo">Undo: ' + esc(st.undo) + '</button>' : '';
+  var scores = '<div class="h-scores">' + st.active.map(function (i) {
+    return '<span class="h-score"><span class="pip" style="background:' + HOUSES[i].color + '"></span>' + HOUSES[i].name + ' <strong>' + st.scores[i] + '</strong></span>';
+  }).join("") + '</div>';
+  var body = "";
+  if (st.phase === "lobby" || st.phase === "sorting" || st.phase === "rosters") {
+    var n = st.players.length;
+    return head + '<div class="p-card"><p class="p-big">You’re the host</p>' +
+      '<p class="muted">' + n + (n === 1 ? ' player has' : ' players have') + ' joined by phone. Sort the houses and start the game on the big screen. During the game you’ll see every answer here and judge it.</p></div>';
+  }
+  if (st.phase === "board") {
+    if (st.boardDone) {
+      body = '<p class="p-big">Board cleared!</p><button class="btn gold big p-wide" data-cmd="startFinal">Go to the final question</button>';
+    } else {
+      var used = {};
+      (st.used || []).forEach(function (k) { used[k] = true; });
+      var grid = CATS.map(function (c) { return '<div class="p-head">' + esc(c.name) + '</div>'; }).join("");
+      for (var v = 1; v <= 10; v++) for (var ci = 0; ci < CATS.length; ci++) {
+        grid += used[ci + "-" + v] ? '<div class="p-tile used" aria-hidden="true"></div>'
+          : '<button class="p-tile" data-cmd="pick" data-cat="' + ci + '" data-v="' + v + '" aria-label="' + esc(CATS[ci].name) + ' for ' + v + '">' + v + '</button>';
+      }
+      return head + scores + '<div class="p-card tight"><p class="p-big">' + HOUSES[st.turn].name + ' is picking</p>' +
+        '<p class="muted small">Their phones can pick, or tap a tile here for them.</p><div class="p-board">' + grid + '</div>' +
+        '<button class="btn ghost" data-cmd="startFinal">Skip to the final question</button></div>' + undo;
+    }
+  } else if (st.phase === "question" || st.phase === "revealed") {
+    var q = st.q;
+    var timerCtl = st.timer ? '<div class="timer p-timer" id="p-timer">' + TIMER_HTML + '</div>' +
+      '<div class="row"><button class="btn ghost" data-cmd="timerPause">' + (st.timer.paused ? 'Resume timer' : 'Pause timer') + '</button>' +
+      '<button class="btn ghost" data-cmd="timerAdd">+15 sec</button></div>' : '';
+    var logHtml = (q.log || []).map(function (e) { return '<li>' + esc(logLine(e)) + '</li>'; }).join("");
+    logHtml = logHtml ? '<ul class="q-log">' + logHtml + '</ul>' : '';
+    body = '<span class="chip">' + esc(q.cat) + ' · ' + q.v + (q.v === 1 ? ' point' : ' points') + '</span>' +
+      '<p class="p-question">' + esc(q.text) + '</p>' +
+      '<div class="p-answer"><span class="eyebrow">Answer' + (st.phase === "revealed" ? '' : ' (only you can see this)') + '</span><span class="p-answer-text">' + esc(q.answer || "") + '</span></div>' +
+      logHtml;
+    if (st.phase === "revealed") {
+      body += '<button class="btn gold big p-wide" data-cmd="next">Next turn</button>';
+    } else if (q.stage === "steal") {
+      var open = st.active.filter(function (i) { return (q.tried || []).indexOf(i) < 0; }).map(function (i) { return HOUSES[i].name; });
+      body += timerCtl + '<p class="p-big">Buzzers are open</p><p class="muted">' + open.join(", ") + ' can buzz in to steal.</p>' +
+        '<button class="btn p-wide" data-cmd="noSteal">No steals, show the answer</button>';
+    } else {
+      var ans = q.answering, steal = ans !== q.first;
+      body += timerCtl + '<p class="p-big">' + HOUSES[ans].name + (steal ? ' is stealing' : ' is answering') + '</p>' +
+        (steal && q.buzz && q.buzz.name ? '<p class="muted">' + esc(q.buzz.name) + ' buzzed first.</p>' : '') +
+        '<div class="judge-pair"><button class="btn judge-btn right-btn" data-cmd="correct">Correct +' + q.v + '</button>' +
+        '<button class="btn judge-btn wrong-btn" data-cmd="wrong">Wrong' + (steal ? ' −' + q.v : '') + '</button></div>' +
+        '<p class="muted small">' + (steal ? 'A wrong steal costs ' + q.v + ' points.' : 'A miss opens buzzers for the other houses.') + '</p>' +
+        '<button class="btn ghost" data-cmd="noSteal">Show the answer, no more points</button>';
+    }
+  } else if (st.phase === "final") {
+    var f = st.fin;
+    body = '<span class="chip">Final · ' + esc(f.cat) + '</span>';
+    if (f.step === "wager") {
+      body += '<p class="p-big">Wagers</p>' + st.active.map(function (i) {
+        var by = f.wagerBy[i];
+        return '<form class="h-wager" data-house="' + i + '"><span class="h-wager-name"><span class="pip" style="background:' + HOUSES[i].color + '"></span>' + HOUSES[i].name +
+          '<span class="muted small"> max ' + f.max[i] + (by ? ' · from ' + esc(by.name) + '’s phone' : '') + '</span></span>' +
+          '<span class="h-wager-row"><label class="sr-only" for="hw-' + i + '">Wager for ' + HOUSES[i].name + '</label>' +
+          '<input id="hw-' + i + '" type="number" inputmode="numeric" min="0" max="' + f.max[i] + '" value="' + esc(f.wagers[i]) + '" placeholder="—">' +
+          '<button class="btn" type="submit">Set</button></span></form>';
+      }).join("") + '<button class="btn gold big p-wide" data-cmd="lockWagers">Lock wagers and show the question</button>';
+    } else if (f.step === "question") {
+      var inCount = f.answers.filter(function (a) { return a; }).length;
+      body += '<p class="p-question">' + esc(f.q) + '</p><div class="p-answer"><span class="eyebrow">Answer (only you can see this)</span><span class="p-answer-text">' + esc(f.a) + '</span></div>' +
+        (st.timer ? '<div class="timer p-timer" id="p-timer">' + TIMER_HTML + '</div>' : '') +
+        '<p class="muted">' + inCount + ' answer' + (inCount === 1 ? '' : 's') + ' in from phones.</p>' +
+        '<button class="btn gold big p-wide" data-cmd="revealFinal">Reveal the answer</button>';
+    } else {
+      var all = st.active.every(function (i) { return f.judged[i] !== null; });
+      body += '<div class="p-answer"><span class="eyebrow">Answer</span><span class="p-answer-text">' + esc(f.a) + '</span></div>' +
+        st.active.map(function (i) {
+          var w = parseInt(f.wagers[i], 10) || 0, j = f.judged[i];
+          return '<div class="h-judge"><span class="h-wager-name"><span class="pip" style="background:' + HOUSES[i].color + '"></span>' + HOUSES[i].name + '<span class="muted small"> wagered ' + w + '</span></span>' +
+            (f.answers[i] ? '<span class="phone-answer">“' + esc(f.answers[i]) + '”</span>' : '<span class="muted small">Answer on paper</span>') +
+            '<span class="judge-pair"><button class="btn judge-btn' + (j === true ? ' right-on' : '') + '" aria-pressed="' + (j === true) + '" data-cmd="judge" data-house="' + i + '" data-right="1">Right +' + w + '</button>' +
+            '<button class="btn judge-btn' + (j === false ? ' wrong-on' : '') + '" aria-pressed="' + (j === false) + '" data-cmd="judge" data-house="' + i + '" data-right="0">Wrong −' + w + '</button></span></div>';
+        }).join("") +
+        (all ? '<button class="btn gold big p-wide" data-cmd="finishFinal">Crown the House Cup winner</button>' : '<p class="muted">Mark every house to crown the winner.</p>');
+    }
+  } else {
+    var order = st.active.slice().sort(function (a, b) { return st.scores[b] - st.scores[a]; });
+    body = '<p class="p-big">Game over</p>' + order.map(function (i, k) {
+      return '<div class="h-rank">' + ORD[k] + ' <span class="pip" style="background:' + HOUSES[i].color + '"></span> ' + HOUSES[i].name + ' <strong>' + st.scores[i] + '</strong></div>';
+    }).join("") + '<p class="muted">Start the next game from the big screen.</p>';
+  }
+  return head + scores + '<div class="p-card">' + body + '</div>' + undo;
+}
+
 function renderPhone() {
-  keepAwake(!!phoneMe());
-  var html = phoneView();
+  keepAwake(hostPhone || !!phoneMe());
+  var html = hostPhone ? hostPhoneView() : phoneView();
   if (html !== ph.html) {
     ph.html = html;
     // Keep whatever someone is typing when the screen redraws.
@@ -1064,7 +1381,7 @@ function renderPhone() {
 }
 
 function phoneOnMsg(p) {
-  if (p.t !== "state" || !Array.isArray(p.players)) return;
+  if (p.t !== (hostPhone ? "hstate" : "state") || !Array.isArray(p.players)) return;
   ph.st = p;
   ph.lastSeen = Date.now();
   ph.timer = p.timer ? { left: p.timer.left, total: p.timer.total, paused: p.timer.paused, at: Date.now() } : null;
@@ -1079,21 +1396,23 @@ function phoneConnect() {
   if (ph.channel) { closeChannel(ph.channel); ph.channel = null; }
   ph.status = "connecting";
   ph.lastKick = Date.now();
-  openChannel(ROOM, phoneOnMsg, function (st) {
+  openChannel(hostPhone ? ROOM + "-h-" + HOSTKEY : ROOM, phoneOnMsg, function (st) {
     if (gen !== ph.gen) return;
     ph.status = st;
-    if (st === "on") { ph.fails = 0; netSend(ph.channel, { t: "hello", id: ph.id }); }
+    if (st === "on") { ph.fails = 0; phoneHello(); }
     if (st === "error" || st === "off") { ph.fails++; phoneRetry(); }
     renderPhone();
   }).then(function (ch) {
     if (gen !== ph.gen) { closeChannel(ch); return; }
     ph.channel = ch;
-    if (ph.status === "on") netSend(ch, { t: "hello", id: ph.id });
+    if (ph.status === "on") phoneHello();
   }).catch(function () {
     if (gen !== ph.gen) return;
     ph.status = "error"; ph.fails++; renderPhone(); phoneRetry();
   });
 }
+
+function phoneHello() { netSend(ph.channel, hostPhone ? { t: "hhello" } : { t: "hello", id: ph.id }); }
 
 function phoneRetry() {
   clearTimeout(ph.retry);
@@ -1116,17 +1435,25 @@ function startPhone() {
     if (document.visibilityState !== "visible") return;
     // Phones often drop the connection while the screen is locked.
     if (ph.status !== "on" || Date.now() - ph.lastSeen > 9000) phoneConnect();
-    else netSend(ph.channel, { t: "hello", id: ph.id });
+    else phoneHello();
     renderPhone();
   });
   setInterval(function () {
-    if (ph.status === "on" && (!ph.st || Date.now() - ph.lastSeen > 8000)) netSend(ph.channel, { t: "hello", id: ph.id });
+    // The host phone says hello on every tick so the big screen knows it's there.
+    if (ph.status === "on" && (hostPhone || !ph.st || Date.now() - ph.lastSeen > 8000)) phoneHello();
     if (ph.st && Date.now() - ph.lastSeen > 15000 && Date.now() - ph.lastKick > 15000) phoneConnect();
     if (ph.buzzed && Date.now() - ph.buzzAt > 2500) ph.buzzed = false;
     if (ph.wantJoin && ph.st && !phoneMe()) netSend(ph.channel, { t: "join", id: ph.id, name: ph.name });
     renderPhone();
   }, 3000);
   document.addEventListener("submit", function (e) {
+    if (e.target.classList && e.target.classList.contains("h-wager")) {
+      e.preventDefault();
+      var hh = +e.target.dataset.house;
+      var amt = parseInt(document.getElementById("hw-" + hh).value, 10);
+      if (!isNaN(amt)) hostCmd("setWager", { house: hh, amount: amt });
+      return;
+    }
     if (e.target.id === "p-join") { e.preventDefault(); phoneJoin(document.getElementById("p-name").value); }
     if (e.target.id === "p-wager") {
       e.preventDefault();
@@ -1148,6 +1475,14 @@ function startPhone() {
     }
   });
   document.addEventListener("click", function (e) {
+    var cmd = e.target.closest && e.target.closest("[data-cmd]");
+    if (hostPhone) {
+      if (!cmd) return;
+      var d = cmd.dataset;
+      hostCmd(d.cmd, { cat: d.cat, v: d.v, house: d.house, right: d.right === "1" });
+      try { if (navigator.vibrate) navigator.vibrate(30); } catch (e2) {}
+      return;
+    }
     if (e.target.closest && e.target.closest("#p-buzz") && !ph.buzzed) phoneBuzz();
     var tile = e.target.closest && e.target.closest("button.p-tile");
     if (tile) netSend(ph.channel, { t: "pick", id: ph.id, cat: +tile.dataset.cat, v: +tile.dataset.v });
@@ -1207,6 +1542,29 @@ var actions = {
   reset: function () { undoStack = []; stopConfetti(); net.buzz = []; resetFin(); state = fresh(); render(); },
   pick: function (el) { openQuestion(+el.dataset.cat, +el.dataset.v); },
   reveal: function () { timerStop(); setState({ revealed: true }); },
+  correct: function () { judgeAnswer(true); },
+  wrong: function () { judgeAnswer(false); },
+  noSteal: function () { finishQuestion(); },
+  tvSteal: function (el) { takeSteal(+el.dataset.team, ""); },
+  next: function () { nextTurn(); },
+  penalty: function (el) {
+    var h = +el.dataset.team;
+    pushUndo(HOUSES[h].name + " wrong steal (−" + state.v + ")");
+    state.scores = state.scores.slice();
+    state.scores[h] -= state.v;
+    state.qLog = state.qLog.concat([{ h: h, ok: false, d: -state.v, steal: true }]);
+    sfx("wrong");
+    render();
+  },
+  showHostQr: function () { net.showHostQr = true; if (!net.hostQr) refreshHostQr(); render(); },
+  hideHostQr: function () { net.showHostQr = false; render(); },
+  newHostLink: function () {
+    net.hostKey = genHostKey(); net.hostSeen = 0; net.showHostQr = true;
+    refreshHostQr();
+    if (net.on) hostConnect();
+    render();
+  },
+  useHostPhone: function () { if (!net.on) enablePhones(""); actions.showHostQr(); },
   back: function () { net.buzz = []; timerStop(); setState({ screen: "board", revealed: false }); },
   award: function (el) {
     var team = +el.dataset.team;
@@ -1294,7 +1652,7 @@ var actions = {
   resume: function () { var sv = pendingSave; pendingSave = null; undoStack = []; restoreSave(sv); render(); },
   discardSave: function () { pendingSave = null; state.setupStep = "names"; render(); }
 };
-var MENU_KEEP = ["openMenu", "toggleMusic", "toggleSfx", "setTimer", "adjust", "askNewGame", "cancelNewGame", "timerPause", "timerAdd"];
+var MENU_KEEP = ["showHostQr", "hideHostQr", "newHostLink", "useHostPhone", "openMenu", "toggleMusic", "toggleSfx", "setTimer", "adjust", "askNewGame", "cancelNewGame", "timerPause", "timerAdd"];
 
 // ---------- Views ----------
 function viewHeader() {
@@ -1305,7 +1663,8 @@ function viewHeader() {
     return '<div class="score' + (isTurn ? ' is-turn' : '') + '"><span class="bar" style="background:' + h.color + '"></span>' +
       '<span class="score-name">' + h.name + '</span><span class="score-num">' + state.scores[i] + '</span></div>';
   }).join("") : "";
-  var netPill = net.on && net.status !== "on" ? '<span class="net-pill" role="status">Phones reconnecting…</span>' : '';
+  var netPill = net.on && net.status !== "on" ? '<span class="net-pill" role="status">Phones reconnecting…</span>'
+    : hostOnline() ? '<span class="host-pill">Host on phone</span>' : '';
   var undoBtn = playing && undoStack.length ? '<button class="btn ghost" data-action="undo" title="Undo: ' + esc(undoStack[undoStack.length - 1].label) + '">Undo</button>' : '';
   var buttons = '<div class="header-btns">' + netPill + undoBtn +
     '<button class="btn ghost menu-btn" data-action="openMenu" aria-haspopup="dialog">' +
@@ -1341,6 +1700,9 @@ function viewMenu() {
       '<button class="btn" data-action="toggleSfx" aria-pressed="' + wantSfx + '">Sound effects: ' + (wantSfx ? 'on' : 'off') + '</button></div></div>' +
     '<div class="menu-sec"><h3 class="menu-h">Answer timer</h3><div class="seg-row" role="group" aria-label="Answer timer length">' + timerBtns + '</div>' +
       '<span class="muted small">Starts when a question opens. A change applies from the next question.</span></div>' +
+    '<div class="menu-sec"><h3 class="menu-h">Host phone</h3>' +
+      (net.on ? viewHostPhoneBlock() : '<div class="row"><button class="btn" data-action="useHostPhone">Set up the host phone</button></div>' +
+        '<span class="muted small">The host sees each answer privately and judges from their phone.</span>') + '</div>' +
     scores +
     '<div class="menu-sec"><h3 class="menu-h">Game</h3>' + game + '</div>' +
     '</div></div>';
@@ -1348,8 +1710,8 @@ function viewMenu() {
 
 function viewTimer() {
   if (!timerActive() || timerRemaining() === null) return "";
-  var paused = state.timerLeft !== null && state.timerLeft !== undefined;
-  return '<div class="timer" id="h-timer">' + TIMER_HTML +
+  var paused = timerPaused();
+  return '<div class="timer' + (state.timerKind === "steal" ? ' steal-timer' : '') + '" id="h-timer">' + TIMER_HTML +
     '<button class="btn ghost small-btn" data-action="timerPause">' + (paused ? 'Resume' : 'Pause') + '</button>' +
     '<button class="btn ghost small-btn" data-action="timerAdd">+15 sec</button></div>';
 }
@@ -1456,27 +1818,64 @@ function viewBoard() {
 
 function viewQuestion() {
   var c = CATS[state.cat];
-  var pair = c.qs[state.v - 1][state.deal[state.cat][state.v - 1]];
+  var pair = currentPair();
   var th = turnHouse();
   var dots = "";
   for (var d = 1; d <= 10; d++) dots += '<span class="dot" style="background:' + (d <= state.v ? "var(--accent)" : "#3A4266") + '"></span>';
+  var logHtml = state.qLog.map(function (e) {
+    return '<li><span class="pip" style="background:' + HOUSES[e.h].color + '"></span>' + esc(logLine(e)) + '</li>';
+  }).join("");
+  logHtml = logHtml ? '<ul class="q-log big-log">' + logHtml + '</ul>' : '';
+  var answerBox = '<div class="answer"><span class="eyebrow">Answer</span><span class="answer-text">' + esc(pair[1]) + '</span></div>';
   var body;
-  if (!state.revealed) {
+  if (state.qMode === "host") {
+    var online = hostOnline();
+    if (state.revealed) {
+      var got = state.qLog.some(function (e) { return e.ok; });
+      body = answerBox + logHtml + (got ? '' : '<p class="muted lead">Nobody got this one.</p>') +
+        '<button class="btn gold big" data-action="next">Next turn</button>';
+    } else if (state.qStage === "steal") {
+      var open = stealers();
+      body = logHtml + '<div class="steal-banner"><span class="steal-title">Buzzers are open!</span>' +
+        '<span class="buzz-line">' + open.map(function (i) {
+          return '<span class="buzz-item"><span class="pip" style="background:' + HOUSES[i].color + '"></span>' + HOUSES[i].name + '</span>';
+        }).join("") + '</span>' +
+        '<span class="muted">First house to buzz on a phone can steal. Right: +' + state.v + '. Wrong: −' + state.v + '.</span></div>' +
+        viewTimer() +
+        '<div class="row">' + (online ? '' : open.map(function (i) {
+          return '<button class="btn house" data-action="tvSteal" data-team="' + i + '"><span class="pip" style="background:' + HOUSES[i].color + '"></span>' + HOUSES[i].name + ' steals</button>';
+        }).join("")) + '<button class="btn ghost" data-action="noSteal">No steals, show the answer</button></div>';
+    } else {
+      var ans = state.qAnswering, steal = ans !== th;
+      var who = '<p class="lead answering"><strong style="color:' + HOUSES[ans].color + '">' + HOUSES[ans].name + '</strong>' +
+        (steal ? ' is stealing!' + (state.qBuzz && state.qBuzz.name ? ' ' + esc(state.qBuzz.name) + ' buzzed first.' : '') : ' answers first.') + '</p>';
+      var judgeBtns = '<div class="row"><button class="btn right-btn" data-action="correct">Correct +' + state.v + '</button>' +
+        '<button class="btn wrong-btn" data-action="wrong">Wrong' + (steal ? ' −' + state.v : '') + '</button>' +
+        '<button class="btn ghost" data-action="noSteal">Show the answer</button></div>';
+      body = logHtml + who + viewTimer() +
+        (online ? '<p class="muted">The host is judging on their phone.</p>' +
+          '<details class="tv-judge"><summary>Judge from this screen instead</summary>' + judgeBtns + '</details>'
+        : '<p class="muted">The host phone isn’t connected, so judge here.</p>' + judgeBtns);
+    }
+  } else if (!state.revealed) {
     var stealNote = teams.active.length > 1
-      ? ' Think they’re wrong? Raise your hand to steal, and give your answer before the reveal.'
+      ? ' If they miss, other houses can raise a hand to steal. A wrong steal costs ' + state.v + (state.v === 1 ? ' point.' : ' points.')
       : '';
-    body = '<p class="muted lead"><strong class="turn-inline" style="color:' + HOUSES[th].color + '">' + HOUSES[th].name + '</strong> answers first.' + stealNote + '</p>' +
-      '<button class="btn gold big" data-action="reveal">Reveal answer</button>';
+    var others = teams.active.filter(function (h) { return h !== th; });
+    body = logHtml + '<p class="muted lead"><strong class="turn-inline" style="color:' + HOUSES[th].color + '">' + HOUSES[th].name + '</strong> answers first.' + stealNote + '</p>' + viewTimer() +
+      '<button class="btn gold big" data-action="reveal">Reveal answer</button>' +
+      (others.length ? '<details class="tv-judge"><summary>Wrong steal before the reveal?</summary><div class="row">' + others.map(function (i) {
+        return '<button class="btn" data-action="penalty" data-team="' + i + '">' + HOUSES[i].name + ' −' + state.v + '</button>';
+      }).join("") + '</div></details>' : '');
   } else {
-    var buzzed = net.buzz.map(function (b) { return b.house; });
-    var order = [th].concat(buzzed, teams.active.filter(function (h) { return h !== th && buzzed.indexOf(h) < 0; }));
+    var order = [th].concat(teams.active.filter(function (h) { return h !== th; }));
     var houseBtns = order.map(function (i) {
       var h = HOUSES[i];
       var label = i === th ? h.name + ' +' + state.v : h.name + ' steals +' + state.v;
-      return '<button class="btn house' + (i === th || buzzed.indexOf(i) >= 0 ? ' picker' : '') + '" data-action="award" data-team="' + i + '"><span class="pip" style="background:' + h.color + '"></span>' +
+      return '<button class="btn house' + (i === th ? ' picker' : '') + '" data-action="award" data-team="' + i + '"><span class="pip" style="background:' + h.color + '"></span>' +
         label + '</button>';
     }).join("");
-    body = '<div class="answer"><span class="eyebrow">Answer</span><span class="answer-text">' + esc(pair[1]) + '</span></div>' +
+    body = answerBox + logHtml +
       '<div class="stack-sm"><span class="label">Who got it?</span><div class="row">' + houseBtns +
       '<button class="btn ghost" data-action="award" data-team="-1">No one</button></div></div>';
   }
@@ -1484,7 +1883,7 @@ function viewQuestion() {
     '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>Back to the board</button>' +
     '<div class="card"><div class="meta"><span class="chip">' + esc(c.name) + '</span><div class="meta-right"><span class="muted small">Difficulty</span>' +
     '<span class="dots">' + dots + '</span><span class="pts">' + state.v + (state.v === 1 ? ' point' : ' points') + '</span></div></div>' +
-    '<p class="question">' + esc(pair[0]) + '</p>' + viewTimer() + viewBuzzBanner() + body + '</div></section>';
+    '<p class="question">' + esc(pair[0]) + '</p>' + body + '</div></section>';
 }
 
 function viewFinal() {
@@ -1592,8 +1991,10 @@ document.addEventListener("keydown", function (e) {
 });
 
 // Host timer: redraw the countdown and play the ticks.
+var lastHostOnline = false;
 setInterval(function () {
   if (phoneMode) { paintPhoneTimer(); return; }
+  if (state && hostOnline() !== lastHostOnline) { lastHostOnline = hostOnline(); renderKeepingInput(); }
   if (!state || !timerActive()) return;
   var rem = timerRemaining();
   if (rem === null) return;
@@ -1605,6 +2006,7 @@ setInterval(function () {
     if (rem <= 0 && !tickState.upPlayed) { tickState.upPlayed = true; sfx("timeup"); hostBroadcast(); }
   }
   tickState.lastSecs = secs;
+  if (!paused && rem <= 0 && state.screen === "question" && state.qStage === "steal" && !state.revealed) finishQuestion();
 }, 250);
 
 document.addEventListener("visibilitychange", function () {
