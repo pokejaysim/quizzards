@@ -9,17 +9,21 @@ A wizard-themed trivia board game for game night, played by four houses.
 - When the board is cleared (or whenever you choose to skip ahead), play the Final Question. Each house wagers secretly, and a right answer adds the wager while a wrong one subtracts it.
 - The highest score wins the House Cup.
 
-## Host mode
+## Judging and steals
 
-For the best game, one person hosts from their own phone. In the setup screen (or the menu), choose **Set up the host phone** and scan that QR code on the host's phone only, since it shows every answer.
+Every question works the same way:
 
-- The host sees each question and its answer, and taps **Correct** or **Wrong**.
-- The picking house answers first. A miss costs nothing, and opens buzzers on the other houses' phones for 15 seconds.
+- The picking house answers first, out loud. Someone taps **Correct** or **Wrong**.
+- A miss costs nothing, and opens buzzers on the other houses' phones for 15 seconds.
 - The first house to buzz steals. Right earns the tile's points, and wrong loses them. After a wrong steal, buzzers reopen for houses that haven't tried.
-- A house without a phone can raise a hand instead. The host taps that house's **steals** button on the host phone or the big screen.
+- A house without a phone can raise a hand instead. Tap that house's **steals** button.
 - If nobody buzzes in time, the answer is shown and nobody scores.
 
-Without a host phone, the big screen runs the game: reveal the answer, then choose who got it.
+### Host phone (optional)
+
+For the fairest game, one person hosts from their own phone. In the setup screen (or the menu), choose **Set up the host phone** and scan that QR code on the host's phone only, since it shows every answer. The host sees each question with its answer and judges from the phone.
+
+Without a host phone, judge on the big screen. If you're not sure of an answer, **Peek at the answer** shows it, but only peek if the big screen isn't what everyone is watching. If the host phone drops out mid-game, the big screen's judge buttons come back on their own.
 
 ## Question library
 

@@ -13,35 +13,52 @@ async function scores(page) {
   return page.evaluate(() => state.scores.slice());
 }
 
-test("sort, answer a question, undo, and fix a score", async ({ page }) => {
+test("judge on the big screen, steal, undo, and fix a score", async ({ page }) => {
   await sortPlayers(page, "Ana, Ben, Cal, Dee");
   await expect(page.locator(".turn-banner")).toBeVisible();
+  const first = await page.evaluate(() => turnHouse());
+  const houses = await page.evaluate(() => teams.active.length);
 
   await page.locator(".tile").nth(18).click(); // a 4-point tile
   await expect(page.locator(".question")).toBeVisible();
   await expect(page.locator("#h-timer")).toBeVisible();
+  await expect(page.locator(".answer")).toHaveCount(0);
 
-  await page.click("[data-action=reveal]");
+  // The answer stays hidden unless someone peeks.
+  const answer = await page.evaluate(() => currentPair()[1]);
+  await expect(page.locator(".peek-answer")).toBeHidden();
+  await page.locator(".peek summary").click();
+  await expect(page.locator(".peek-answer")).toHaveText(answer);
+
+  // The picking house gets it right.
+  await page.click("[data-action=correct]");
   await expect(page.locator("#h-timer")).toHaveCount(0);
-  const team = await page.locator(".btn.house").first().getAttribute("data-team");
-  await page.locator(".btn.house").first().click();
-  const after = await scores(page);
-  expect(after[+team]).toBe(4);
-  await expect(page.locator(".tile.used")).toHaveCount(1);
+  await expect(page.locator(".answer-text")).toHaveText(answer);
+  expect((await scores(page))[first]).toBe(4);
 
-  // Undo goes back to the award buttons with the score removed.
+  // Undo puts the question back with the points removed.
   await page.click("header [data-action=undo]");
-  expect((await scores(page))[+team]).toBe(0);
-  await expect(page.locator(".btn.house").first()).toBeVisible();
-  await page.locator("[data-action=award][data-team='-1']").click();
+  expect((await scores(page))[first]).toBe(0);
+
+  // This time they miss, and another house steals it.
+  await page.click("[data-action=wrong]");
+  await expect(page.locator(".steal-banner")).toBeVisible();
+  await expect(page.locator("[data-action=tvSteal]")).toHaveCount(houses - 1);
+  const thief = +(await page.locator("[data-action=tvSteal]").first().getAttribute("data-team"));
+  await page.locator("[data-action=tvSteal]").first().click();
+  await page.click("[data-action=correct]");
+  expect((await scores(page))[thief]).toBe(4);
+  expect((await scores(page))[first]).toBe(0);
+  await page.click("[data-action=next]");
+  await expect(page.locator(".tile.used")).toHaveCount(1);
 
   // Fix a score by hand from the menu.
   await page.click("[data-action=openMenu]");
-  await page.locator(`[data-action=adjust][data-house='${team}'][data-d='5']`).click();
+  await page.locator(`[data-action=adjust][data-house='${thief}'][data-d='5']`).click();
   await expect(page.locator(".modal")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.locator(".modal")).toHaveCount(0);
-  expect((await scores(page))[+team]).toBe(5);
+  expect((await scores(page))[thief]).toBe(9);
 });
 
 test("the timer counts down, pauses and can be turned off", async ({ page }) => {
@@ -73,8 +90,8 @@ test("the timer counts down, pauses and can be turned off", async ({ page }) => 
 test("a reload offers to resume the game exactly where it was", async ({ page }) => {
   await sortPlayers(page, "Ana, Ben, Cal");
   await page.locator(".tile").nth(30).click();
-  await page.click("[data-action=reveal]");
-  await page.locator(".btn.house").first().click();
+  await page.click("[data-action=correct]");
+  await page.click("[data-action=next]");
   const before = await scores(page);
   const turn = await page.evaluate(() => state.turn);
 
