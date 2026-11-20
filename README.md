@@ -14,8 +14,9 @@ A wizard-themed trivia board game for game night, played by four houses.
 For the best game, one person hosts from their own phone. In the setup screen (or the menu), choose **Set up the host phone** and scan that QR code on the host's phone only, since it shows every answer.
 
 - The host sees each question and its answer, and taps **Correct** or **Wrong**.
-- The picking house answers first. A miss costs nothing, and opens buzzers on the other houses' phones for 10 seconds.
+- The picking house answers first. A miss costs nothing, and opens buzzers on the other houses' phones for 15 seconds.
 - The first house to buzz steals. Right earns the tile's points, and wrong loses them. After a wrong steal, buzzers reopen for houses that haven't tried.
+- A house without a phone can raise a hand instead. The host taps that house's **steals** button on the host phone or the big screen.
 - If nobody buzzes in time, the answer is shown and nobody scores.
 
 Without a host phone, the big screen runs the game: reveal the answer, then choose who got it.

@@ -160,6 +160,63 @@ test("a steal that gets it right wins the points", async ({ browser }) => {
   expect(errors).toEqual([]);
 });
 
+test("a house without a phone can steal from the host phone or the big screen", async ({ browser }) => {
+  const { relay, host, code, errors } = await setup(browser, ["Mao", "Sam"]);
+  await sortPlayers(host);
+  // Ana plays on paper in Hufflepuff, so her house has no buzzer.
+  await fixHouses(host, { Mao: 0, Ana: 1, Sam: 2 }, 0);
+  const hp = await addHostPhone(browser, relay, host, code, errors);
+  await host.locator(".tile").nth(20).click(); // a 4-point tile
+  await hp.click("[data-cmd=wrong]");
+
+  // Both screens offer a steal button for each open house, even with the host phone on.
+  await expect(host.locator("[data-action=tvSteal]")).toHaveCount(2);
+  await expect(hp.locator("[data-cmd=steal]")).toHaveCount(2);
+
+  // Hufflepuff raises a hand; the host taps it on their phone, and it's wrong.
+  await hp.click("[data-cmd=steal][data-house='1']");
+  await expect(hp.getByText("Hufflepuff is stealing")).toBeVisible();
+  await hp.click("[data-cmd=wrong]");
+  expect(await host.evaluate(() => state.scores[1])).toBe(-4);
+
+  // Only Ravenclaw is left. This time the steal is tapped on the big screen.
+  await expect(host.locator("[data-action=tvSteal]")).toHaveCount(1);
+  await host.click("[data-action=tvSteal][data-team='2']");
+  await expect(hp.getByText("Ravenclaw is stealing")).toBeVisible();
+  await hp.click("[data-cmd=correct]");
+  expect(await host.evaluate(() => state.scores.slice())).toEqual([0, -4, 4, 0]);
+  expect(errors).toEqual([]);
+});
+
+test("a question that opened while the host phone was away still opens buzzers", async ({ browser }) => {
+  const { relay, host, phones, code, errors } = await setup(browser, ["Mao", "Sam", "Lee"]);
+  await sortPlayers(host);
+  await fixHouses(host, { Mao: 0, Sam: 2, Lee: 3 }, 0);
+  const [, sam, lee] = phones;
+
+  // No host phone yet, so the question opens the classic way. Slytherin
+  // shouts a wrong steal before the reveal and loses the points.
+  await host.locator(".tile").nth(13).click(); // a 3-point tile
+  expect(await host.evaluate(() => state.qMode)).toBe("classic");
+  await host.locator("details.tv-judge summary").click();
+  await host.click("[data-action=penalty][data-team='3']");
+
+  // The host phone comes back and takes over judging.
+  const hp = await addHostPhone(browser, relay, host, code, errors);
+  await expect(hp.locator("[data-cmd=wrong]")).toBeVisible();
+  expect(await host.evaluate(() => state.qMode)).toBe("host");
+  await hp.click("[data-cmd=wrong]");
+
+  // Ravenclaw's buzzer opens; Slytherin already had its try.
+  await expect(sam.locator("#p-buzz")).toBeVisible();
+  await expect(lee.getByText("Your house already answered.")).toBeVisible();
+  await sam.click("#p-buzz");
+  await expect(hp.getByText("Ravenclaw is stealing")).toBeVisible();
+  await hp.click("[data-cmd=correct]");
+  expect(await host.evaluate(() => state.scores.slice())).toEqual([0, 0, 3, -3]);
+  expect(errors).toEqual([]);
+});
+
 test("final question run from the host phone", async ({ browser }) => {
   const { relay, host, phones, code, errors } = await setup(browser, ["Mao", "Sam"]);
   await sortPlayers(host);

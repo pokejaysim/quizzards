@@ -326,7 +326,11 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:70;opa
 .timer-fill{background:var(--wash-gold)}
 .steal-timer .timer-fill{background:radial-gradient(120% 140% at 30% 25%,#A9CDF0,#6E93E0 60%,#4E6FB5)}
 .timer.low .timer-fill{background:var(--wash-red)}
-.buzzer{filter:url(#rough-soft);background-image:radial-gradient(circle at 35% 30%,rgba(255,255,255,.35),transparent 55%)!important}
+.buzzer{position:relative;isolation:isolate;border-color:transparent;background-image:radial-gradient(circle at 35% 30%,rgba(255,255,255,.35),transparent 55%)!important}
+.buzzer::before{content:"";position:absolute;inset:-6px;border-radius:50%;border:6px solid rgba(255,255,255,.45);filter:url(#rough-soft);pointer-events:none;z-index:-1}
+.h-steals{display:grid;gap:8px;margin:10px 0}
+.h-steal{justify-content:center}
+.h-steal .pip{margin-right:8px}
 input[type=text],input[type=number],.name-row input,.wager input,.h-wager-row input,.p-card input{background:rgba(10,12,24,.55)!important;border:1.5px solid rgba(243,239,230,.28)!important;border-radius:12px!important;box-shadow:inset 0 2px 6px rgba(0,0,0,.35)}
 input:focus{border-color:var(--accent)!important;outline:none}
 .final-title,.steal-title,.splash-title,.winner-text,.hat-house,h1{font-weight:800;letter-spacing:.01em}
@@ -457,7 +461,7 @@ function markSeen(key) {
 
 // ----- Answer timer -----
 var tickState = { lastSecs: null, upPlayed: false };
-var STEAL_MS = 10000;
+var STEAL_MS = 15000;
 function timerStart(kind) {
   tickState = { lastSecs: null, upPlayed: false };
   state.timerKind = kind || "answer";
@@ -517,6 +521,17 @@ function judgeAnswer(ok) {
   if (ok) { finishQuestion(); return; }
   state.qTried = state.qTried.concat([h]);
   if (stealers().length) openSteal(); else finishQuestion();
+}
+
+// A question can open in classic mode if the host phone was briefly offline
+// (a locked screen, say). As soon as the host judges, switch it to host mode so
+// the buzzers work. Houses that already lost points on a steal can't try again.
+function ensureHostMode() {
+  if (state.screen !== "question" || state.revealed || state.qMode === "host") return;
+  state.qMode = "host";
+  state.qStage = "answer";
+  state.qAnswering = turnHouse();
+  state.qTried = state.qLog.filter(function (e) { return e.steal; }).map(function (e) { return e.h; });
 }
 
 function stealers() {
@@ -1012,15 +1027,17 @@ function hostPrivOnMsg(p) {
     var was = hostOnline();
     net.hostSeen = Date.now();
     // A question opened before the host phone joined switches over to it.
-    if (state.screen === "question" && !state.revealed && state.qMode === "classic" && !state.qLog.length) state.qMode = "host";
+    if (state.screen === "question" && !state.revealed && state.qMode === "classic") { ensureHostMode(); was = false; }
     if (!was) render(); else netSend(net.hchannel, hostPrivateSnapshot());
     return;
   }
   if (p.t !== "cmd") return;
   net.hostSeen = Date.now();
   var a = p.act;
+  if (a === "correct" || a === "wrong" || a === "steal") ensureHostMode();
   if (a === "correct") judgeAnswer(true);
   else if (a === "wrong") judgeAnswer(false);
+  else if (a === "steal") { var sh = parseInt(p.house, 10); if (!isNaN(sh)) takeSteal(sh, ""); }
   else if (a === "noSteal") { if (state.screen === "question" && !state.revealed) finishQuestion(); }
   else if (a === "next") { if (state.screen === "question" && state.revealed) nextTurn(); }
   else if (a === "pick") {
@@ -1138,7 +1155,7 @@ function hostOnMsg(p) {
   if (p.t === "buzz" && typeof p.id === "string") {
     var who = net.ids[p.id];
     var h = who ? houseOfName(who) : null;
-    if (!h || state.qMode !== "host") return;
+    if (!h || state.screen !== "question" || state.qStage !== "steal") return;
     takeSteal(h.house, who);
   }
 }
@@ -1281,8 +1298,16 @@ function phoneJoin(name) {
 
 function phoneBuzz() {
   ph.buzzed = true;
-  ph.buzzAt = Date.now();
+  var at = ph.buzzAt = Date.now();
   netSend(ph.channel, { t: "buzz", id: ph.id });
+  // A message can get lost on a shaky connection. If the window is still open
+  // a moment later, send the buzz again, then let the button be tapped again.
+  setTimeout(function () {
+    if (ph.buzzAt === at && ph.st && ph.st.q && ph.st.q.stage === "steal") netSend(ph.channel, { t: "buzz", id: ph.id });
+  }, 1200);
+  setTimeout(function () {
+    if (ph.buzzAt === at && ph.buzzed) { ph.buzzed = false; renderPhone(); }
+  }, 2500);
   sfx("buzz");
   try { if (navigator.vibrate) navigator.vibrate(60); } catch (e) {}
   renderPhone();
@@ -1343,16 +1368,16 @@ function phoneView() {
       var gotIt = (q.log || []).some(function (e) { return e.ok; });
       body = qBlock + '<div class="p-answer"><span class="eyebrow">Answer</span><span class="p-answer-text">' + esc(q.answer || "") + '</span></div>' +
         logHtml + (gotIt || q.mode === "classic" ? '' : '<p class="muted">Nobody got this one.</p>');
-    } else if (q.mode !== "host") {
-      body = qBlock + (myTurn ? '<p class="p-big">Your house answers first.</p><p class="muted">Talk it over and say your answer out loud.</p>'
-        : '<p class="p-big">' + firstName + ' answers first.</p><p class="muted">If they miss, raise your hand to steal. A wrong steal costs ' + q.v + ' points.</p>') + logHtml;
     } else if (q.stage === "steal") {
       if ((q.tried || []).indexOf(me.house) >= 0) {
         body = qBlock + logHtml + '<p class="p-big">Your house already answered.</p><p class="muted">The other houses can steal.</p>';
       } else {
         body = qBlock + logHtml + '<button class="buzzer" id="p-buzz" style="background:' + h.color + '">' + (ph.buzzed ? 'Buzzed…' : 'Buzz to steal') + '</button>' +
-          '<p class="muted">Right: +' + q.v + '. Wrong: −' + q.v + '. First house to buzz answers.</p>';
+          '<p class="muted">Right: +' + q.v + '. Wrong: −' + q.v + '. First house to buzz answers. No buzzer working? Raise your hand and the host can pick your house.</p>';
       }
+    } else if (q.mode !== "host") {
+      body = qBlock + (myTurn ? '<p class="p-big">Your house answers first.</p><p class="muted">Talk it over and say your answer out loud.</p>'
+        : '<p class="p-big">' + firstName + ' answers first.</p><p class="muted">If they miss, raise your hand to steal. A wrong steal costs ' + q.v + ' points.</p>') + logHtml;
     } else {
       var ans = q.answering, steal = ans !== q.first, ansName = HOUSES[ans] ? HOUSES[ans].name : "";
       if (ans === me.house) {
@@ -1449,8 +1474,12 @@ function hostPhoneView() {
       body += '<button class="btn gold big p-wide" data-cmd="next">Next turn</button>';
     } else if (q.stage === "steal") {
       var open = st.active.filter(function (i) { return (q.tried || []).indexOf(i) < 0; }).map(function (i) { return HOUSES[i].name; });
-      body += timerCtl + '<p class="p-big">Buzzers are open</p><p class="muted">' + open.join(", ") + ' can buzz in to steal.</p>' +
-        '<button class="btn p-wide" data-cmd="noSteal">No steals, show the answer</button>';
+      var openIdx = st.active.filter(function (i) { return (q.tried || []).indexOf(i) < 0; });
+      body += timerCtl + '<p class="p-big">Buzzers are open</p><p class="muted">' + open.join(", ") + ' can buzz in to steal. If a house raises a hand instead, tap it here.</p>' +
+        '<div class="h-steals">' + openIdx.map(function (i) {
+          return '<button class="btn p-wide h-steal" data-cmd="steal" data-house="' + i + '"><span class="pip" style="background:' + HOUSES[i].color + '"></span>' + HOUSES[i].name + ' steals</button>';
+        }).join("") + '</div>' +
+        '<button class="btn ghost p-wide" data-cmd="noSteal">No steals, show the answer</button>';
     } else {
       var ans = q.answering, steal = ans !== q.first;
       body += timerCtl + '<p class="p-big">' + HOUSES[ans].name + (steal ? ' is stealing' : ' is answering') + '</p>' +
@@ -1975,11 +2004,11 @@ function viewQuestion() {
         '<span class="buzz-line">' + open.map(function (i) {
           return '<span class="buzz-item"><span class="pip" style="background:' + HOUSES[i].color + '"></span>' + HOUSES[i].name + '</span>';
         }).join("") + '</span>' +
-        '<span class="muted">First house to buzz on a phone can steal. Right: +' + state.v + '. Wrong: −' + state.v + '.</span></div>' +
+        '<span class="muted">First house to buzz in steals. No phone? Raise a hand and tap the house below. Right: +' + state.v + '. Wrong: −' + state.v + '.</span></div>' +
         viewTimer() +
-        '<div class="row">' + (online ? '' : open.map(function (i) {
+        '<div class="row">' + open.map(function (i) {
           return '<button class="btn house" data-action="tvSteal" data-team="' + i + '"><span class="pip" style="background:' + HOUSES[i].color + '"></span>' + HOUSES[i].name + ' steals</button>';
-        }).join("")) + '<button class="btn ghost" data-action="noSteal">No steals, show the answer</button></div>';
+        }).join("") + '<button class="btn ghost" data-action="noSteal">No steals, show the answer</button></div>';
     } else {
       var ans = state.qAnswering, steal = ans !== th;
       var who = '<p class="lead answering"><strong style="color:' + HOUSES[ans].color + '">' + HOUSES[ans].name + '</strong>' +
